@@ -40,11 +40,18 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
   const counterparties = result.counterparties?.length ?? result.normalized?.counterparties?.length ?? 0
   const vaspTarget = (result.vasp?.target as Record<string, any> | undefined)?.verdict
   const targetState = vaspTarget?.state ?? 'unidentified'
+  const targetProviders = ((result.vasp?.target as Record<string, any> | undefined)?.providers ?? []) as Array<Record<string, any>>
+  const attributionRows = targetProviders.length
+    ? targetProviders.filter((provider) => provider.entity_name || provider.label || provider.wallet_id).slice(0, 6)
+    : [{ entity_name: vaspTarget?.consensus || 'No VASP identified', confidence: vaspTarget?.confidence || 'none', provider: 'comparison' }]
 
-  // Risk Score derivation
-  const riskScore = targetState === 'sanctioned' ? 95 : targetState === 'exchange' ? 45 : 78
-  const riskLevel = riskScore > 80 ? 'CRITICAL' : riskScore > 50 ? 'HIGH' : 'MEDIUM'
+  const riskScore = result.risk?.score ?? 0
+  const riskLevel = result.risk?.level ?? 'LOW'
+  const riskComponents = result.risk?.components ?? {}
   const riskColor = riskScore > 80 ? 'var(--critical)' : riskScore > 50 ? 'var(--amber)' : 'var(--emerald)'
+  const identifiedEntity = String(vaspTarget?.consensus || '')
+  const outboundEvents = Number(result.risk?.signals?.outbound_event_count ?? result.derived?.outbound_event_count ?? 0)
+  const maxHop = Number(result.risk?.signals?.max_hop ?? 0)
 
   const handleDownloadPDF = () => {
     setDownloadSuccess(true)
@@ -147,47 +154,27 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '3px solid #00FFA3' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <strong style={{ fontSize: '1rem' }}>Binance</strong>
-                  <span className="badge badge-low" style={{ fontSize: '0.65rem' }}>2 Hops</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
-                  0x28C6...16e2
-                </div>
-                <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Confidence</span>
-                  <span style={{ color: 'var(--emerald)', fontWeight: 600 }}>98% (High)</span>
-                </div>
-              </div>
-
-              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '3px solid #00F2FE' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <strong style={{ fontSize: '1rem' }}>WazirX</strong>
-                  <span className="badge badge-medium" style={{ fontSize: '0.65rem' }}>3 Hops</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
-                  0x5642...884b
-                </div>
-                <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Confidence</span>
-                  <span style={{ color: 'var(--primary)', fontWeight: 600 }}>85% (Cluster)</span>
-                </div>
-              </div>
-
-              <div className="glass-panel" style={{ padding: '1rem', borderLeft: '3px solid #FFB800' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <strong style={{ fontSize: '1rem' }}>Tornado Cash</strong>
-                  <span className="badge badge-critical" style={{ fontSize: '0.65rem' }}>Mixer (1 Hop)</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
-                  0x12D6...779A
-                </div>
-                <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Confidence</span>
-                  <span style={{ color: 'var(--critical)', fontWeight: 600 }}>100% (OFAC Flag)</span>
-                </div>
-              </div>
+              {attributionRows.map((provider, index) => {
+                const label = provider.entity_name || provider.label || provider.wallet_id || 'Unidentified provider'
+                const evidence = provider.provider || 'provider comparison'
+                const confidence = provider.confidence || vaspTarget?.confidence || 'none'
+                const color = index === 0 ? '#00FFA3' : index % 2 ? '#00F2FE' : '#FFB800'
+                return (
+                  <div key={`${label}-${index}`} className="glass-panel" style={{ padding: '1rem', borderLeft: `3px solid ${color}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+                      <strong style={{ fontSize: '1rem' }}>{String(label)}</strong>
+                      <span className="badge badge-medium" style={{ fontSize: '0.65rem' }}>{String(evidence)}</span>
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
+                      {String(provider.wallet_id || result.address)}
+                    </div>
+                    <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Confidence</span>
+                      <span style={{ color: color, fontWeight: 600 }}>{String(confidence)}</span>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
 
@@ -202,7 +189,7 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
                   <Zap size={16} /> Rapid Velocity Movement
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-                  Funds transferred across 4 addresses within 180 seconds of victim deposit.
+                  {outboundEvents} outbound event(s) were observed in the collected evidence. Confirm timing and victim linkage before escalation.
                 </p>
               </div>
 
@@ -211,7 +198,7 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
                   <Repeat size={16} /> Peel Chain Structuring
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-                  Small uniform amounts peeled off iteratively to evade AML transaction threshold filters.
+                  The deepest observed path is {maxHop} hop(s). Review repeated counterparties and amount patterns before classifying layering.
                 </p>
               </div>
 
@@ -220,7 +207,7 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
                   <AlertOctagon size={16} /> High-Risk Mixer Proximity
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-                  Direct single-hop interaction with a sanctioned obfuscation pool.
+                  VASP state is {targetState}. No mixer or darknet conclusion is made unless a provider supplies explicit supporting evidence.
                 </p>
               </div>
             </div>
@@ -233,13 +220,13 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
             </h3>
             <ol style={{ paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
               <li>
-                <strong style={{ color: 'var(--text-primary)' }}>Issue Section 91 CrPC Notice:</strong> Dispatch immediate freeze request to Binance Compliance regarding deposit address <code className="font-mono" style={{ color: 'var(--primary)' }}>0x28C6...16e2</code>.
+                <strong style={{ color: 'var(--text-primary)' }}>Validate attribution:</strong> {identifiedEntity ? `Review ${identifiedEntity} evidence and confirm the provider confidence before sending a preservation request.` : 'No provider consensus was returned; seek additional lawful evidence before contacting a VASP.'}
               </li>
               <li>
-                <strong style={{ color: 'var(--text-primary)' }}>NCRP Cross-Reference:</strong> 3 other complaints filed in Telangana Cyber Cell share counterparty address <code className="font-mono" style={{ color: 'var(--primary)' }}>0x5642...884b</code>.
+                <strong style={{ color: 'var(--text-primary)' }}>Review graph hops:</strong> Inspect {counterparties} unique counterparty address(es) and preserve the raw provider snapshot with the investigation ID.
               </li>
               <li>
-                <strong style={{ color: 'var(--text-primary)' }}>LEADS Submission:</strong> Export dossier and register cluster on the Indian Cyber Crime Coordination Centre portal.
+                <strong style={{ color: 'var(--text-primary)' }}>Record limitations:</strong> Treat the baseline score ({riskScore}/100) as triage only; it is not a legal conclusion or trained-model output.
               </li>
             </ol>
           </section>
@@ -278,7 +265,7 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
             </div>
 
             <div style={{ marginTop: '1rem' }}>
-              <span className={`badge ${riskLevel === 'CRITICAL' ? 'badge-critical' : 'badge-high'}`}>
+              <span className={`badge ${riskLevel === 'CRITICAL' ? 'badge-critical' : riskLevel === 'HIGH' ? 'badge-high' : riskLevel === 'MEDIUM' ? 'badge-medium' : 'badge-low'}`}>
                 {riskLevel} RISK CLUSTER
               </span>
             </div>
@@ -288,33 +275,34 @@ export function TraceResultsView({ result, graph, onBack, onSelectNode }: TraceR
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
                   <span>Mixer / Darknet Proximity</span>
-                  <strong className="mono-val" style={{ color: 'var(--critical)' }}>92%</strong>
+                  <strong className="mono-val" style={{ color: 'var(--critical)' }}>{riskComponents.vasp_signal ?? 0}%</strong>
                 </div>
                 <div style={{ height: '6px', backgroundColor: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '92%', height: '100%', backgroundColor: 'var(--critical)' }} />
+                  <div style={{ width: `${riskComponents.vasp_signal ?? 0}%`, height: '100%', backgroundColor: 'var(--critical)' }} />
                 </div>
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
                   <span>Transaction Velocity</span>
-                  <strong className="mono-val" style={{ color: 'var(--amber)' }}>85%</strong>
+                  <strong className="mono-val" style={{ color: 'var(--amber)' }}>{riskComponents.transaction_velocity ?? 0}%</strong>
                 </div>
                 <div style={{ height: '6px', backgroundColor: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '85%', height: '100%', backgroundColor: 'var(--amber)' }} />
+                  <div style={{ width: `${riskComponents.transaction_velocity ?? 0}%`, height: '100%', backgroundColor: 'var(--amber)' }} />
                 </div>
               </div>
 
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.2rem' }}>
                   <span>Fan-Out Entropy</span>
-                  <strong className="mono-val" style={{ color: 'var(--primary)' }}>68%</strong>
+                  <strong className="mono-val" style={{ color: 'var(--primary)' }}>{riskComponents.counterparty_fanout ?? 0}%</strong>
                 </div>
                 <div style={{ height: '6px', backgroundColor: 'var(--surface-hover)', borderRadius: '3px', overflow: 'hidden' }}>
-                  <div style={{ width: '68%', height: '100%', backgroundColor: 'var(--primary)' }} />
+                  <div style={{ width: `${riskComponents.counterparty_fanout ?? 0}%`, height: '100%', backgroundColor: 'var(--primary)' }} />
                 </div>
               </div>
             </div>
+            {result.risk?.disclaimer && <p style={{ marginTop: '1rem', color: 'var(--text-muted)', fontSize: '0.7rem', lineHeight: 1.4 }}>{result.risk.disclaimer}</p>}
           </div>
 
           {/* Address Telemetry Summary */}

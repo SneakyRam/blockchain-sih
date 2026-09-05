@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Search, ArrowRight, ShieldAlert, Cpu, Activity, Clock, ExternalLink, RefreshCw, Zap } from 'lucide-react'
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts'
 import { resolveAddress } from '../api'
+import { SystemStatusPanel } from './SystemStatusPanel'
+import type { AuthStatusResult, GraphStatusResult, ProviderDiagnosticsResult } from '../types'
 
 interface DashboardProps {
   onStartTrace: (address: string, chain: string, crossChain: string) => void
@@ -14,6 +16,13 @@ interface DashboardProps {
     exchange: string
     time: string
   }>
+  apiConnected: boolean
+  apiError: string
+  graphStatus: GraphStatusResult | null
+  diagnostics: ProviderDiagnosticsResult | null
+  databaseStatus: AuthStatusResult | null
+  infrastructureLoading: boolean
+  investigationError: string
 }
 
 const RISK_DATA = [
@@ -31,7 +40,17 @@ const TOP_EXCHANGES = [
   { name: 'Bybit', volume: '15.4 BTC', share: 5 },
 ]
 
-export function Dashboard({ onStartTrace, recentTraces }: DashboardProps) {
+export function Dashboard({
+  onStartTrace,
+  recentTraces,
+  apiConnected,
+  apiError,
+  graphStatus,
+  diagnostics,
+  databaseStatus,
+  infrastructureLoading,
+  investigationError,
+}: DashboardProps) {
   const [address, setAddress] = useState('')
   const [selectedChain, setSelectedChain] = useState('auto')
   const [detectedBadge, setDetectedBadge] = useState<string | null>(null)
@@ -80,6 +99,21 @@ export function Dashboard({ onStartTrace, recentTraces }: DashboardProps) {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '1440px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <SystemStatusPanel
+        apiConnected={apiConnected}
+        apiError={apiError}
+        graphStatus={graphStatus}
+        diagnostics={diagnostics}
+        databaseStatus={databaseStatus}
+        loading={infrastructureLoading}
+      />
+
+      {investigationError && (
+        <div style={{ padding: '0.9rem 1rem', border: '1px solid rgba(255, 51, 102, 0.35)', borderRadius: '10px', color: 'var(--critical)', backgroundColor: 'rgba(255, 51, 102, 0.08)' }}>
+          Investigation was not created: {investigationError}
+        </div>
+      )}
+
       {/* Search Bar - Prominent 56px with Auto-detect */}
       <section className="glass-panel" style={{ padding: '1.5rem 2rem', position: 'relative', overflow: 'hidden' }}>
         <div style={{

@@ -6,6 +6,22 @@ import os
 load_dotenv()
 
 class Settings(BaseModel):
+    database_url: str = os.getenv("DATABASE_URL", "")
+    postgres_host: str = os.getenv("POSTGRES_HOST", "127.0.0.1")
+    postgres_port: str = os.getenv("POSTGRES_PORT", "5432")
+    postgres_db: str = os.getenv("POSTGRES_DB", "sih26183")
+    postgres_user: str = os.getenv("POSTGRES_USER", "postgres")
+    postgres_password: str = os.getenv("POSTGRES_PASSWORD", "")
+    google_client_id: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    google_client_secret: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    google_redirect_uri: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:5173/auth/callback")
+    google_allowed_hosted_domain: str = os.getenv("GOOGLE_ALLOWED_HOSTED_DOMAIN", "")
+    frontend_url: str = os.getenv("FRONTEND_URL", "http://localhost:5173")
+    admin_email: str = os.getenv("ADMIN_EMAIL", "")
+    admin_password: str = os.getenv("ADMIN_PASSWORD", "")
+    session_secret: str = os.getenv("SESSION_SECRET", "")
+    session_cookie_name: str = os.getenv("SESSION_COOKIE_NAME", "sih26183_session")
+    session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
     blockchain_com_api_key: str = os.getenv("BLOCKCHAIN_COM_API_KEY", "")
     etherscan_api_key: str = os.getenv("ETHERSCAN_API_KEY", "")
     bitquery_access_token: str = os.getenv("BITQUERY_ACCESS_TOKEN", "")

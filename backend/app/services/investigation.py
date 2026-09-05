@@ -16,6 +16,7 @@ from app.connectors.trongrid import TronGridConnector
 from app.core.address import detect_chain, normalize_chain, validate_for_chain
 from app.core.graph import build_transaction_graph
 from app.core.normalize import derive_features, public_event, sort_events, strip_none
+from app.core.risk import calculate_risk
 from app.graph.service import get_graph_service
 from app.schemas.models import InvestigationRequest
 from app.storage.json_store import save_snapshot
@@ -322,6 +323,7 @@ class InvestigationService:
                     labels_map[address.lower()] = label
 
         graph = build_transaction_graph(request.address, public_transactions, labels_map)
+        risk = calculate_risk(public_transactions, counterparties, vasp_summary)
         normalized = {
             "investigation_id": investigation_id,
             "wallet": strip_none(wallet),
@@ -334,6 +336,7 @@ class InvestigationService:
                 "assets": len(assets),
             },
             "derived": derived,
+            "risk": risk,
         }
 
         payload = {
@@ -362,6 +365,7 @@ class InvestigationService:
             "assets": normalized["assets"],
             "graph": graph,
             "derived": derived,
+            "risk": risk,
             "vasp": vasp_summary,
             "errors": errors,
         }

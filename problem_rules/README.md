@@ -1466,3 +1466,29 @@ Investigator Visualization
 ```
 
 to create a unified **Real-Time Crypto Fraud Attribution and Investigation Platform**.
+
+---
+
+# 41. Current Provider Status
+
+The repository now exposes `POST /api/v1/provider-diagnostics` for an aggregated provider matrix. The endpoint reports whether each provider is configured, reachable, and successful, along with a record count, latency, and evidence limitation.
+
+Current code-level status:
+
+| Provider | Purpose | Endpoint | Required key | Pagination | Supported chains | Status in repo | Expected success | Known failure | Limitations |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Blockchain.com | Bitcoin transaction collection | `https://blockchain.info/rawaddr/{address}` | None | `limit` and `offset` | Bitcoin | Implemented | HTTP 200 with `txs` or valid empty payload | Network/API error | Explorer data only |
+| Etherscan | Ethereum / Polygon collection | `https://api.etherscan.io/v2/api` | `ETHERSCAN_API_KEY` | `page` and `offset` | Ethereum, Polygon | Implemented | HTTP 200 with transaction or balance data | Missing key or API error | Explorer data only |
+| Infura | EVM RPC verification | JSON-RPC endpoint | `INFURA_PROJECT_ID` or custom URL | RPC call based | Ethereum, Polygon | Implemented | JSON-RPC result for `eth_getBalance` | Missing endpoint or RPC error | RPC only, not VASP evidence |
+| Alchemy | EVM transaction/data provider | JSON-RPC endpoint | `ALCHEMY_API_KEY` or custom URL | `pageKey` for transfers | Ethereum, Polygon | Implemented | JSON-RPC result for transfer / RPC request | Missing key or RPC error | Data provider only |
+| TronGrid | TRON data adapter | `https://api.trongrid.io` | Optional `TRON_API_KEY` | Fingerprint pagination | Tron | Implemented | Account or transfer payload | Network/API error | Data adapter only |
+| MetaSleuth | Address label enrichment | `https://aml.blocksec.com/address-label/api/v3/labels` | `METASLEUTH_API_KEY` | Provider defined | Bitcoin, Ethereum, Polygon, Tron | Implemented | Label payload or valid empty result | Missing key or API error | Enrichment evidence only |
+| WalletExplorer | Bitcoin clustering enrichment | `https://www.walletexplorer.com/api/1/address-lookup` | None | Provider defined | Bitcoin | Implemented | Label or cluster payload | Network/API error | Cluster evidence only |
+
+Planned but not yet implemented in this repository:
+
+- PostgreSQL system of record.
+- Alembic migrations.
+- Google OIDC login and secure session management.
+- Case ownership and RBAC.
+- Persistent audit trail and report storage.

@@ -29,6 +29,11 @@ class GraphSyncRequest(BaseModel):
     chain: str = ""
     payload: dict[str, Any] | None = None
 
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=256)
+
 class NormalizedTransaction(BaseModel):
     event_type: str | None = None
     event_id: str
@@ -88,6 +93,7 @@ class InvestigationResponse(BaseModel):
     assets: list[WalletAsset] = Field(default_factory=list)
     graph: dict[str, Any] = Field(default_factory=dict)
     derived: dict[str, Any] = Field(default_factory=dict)
+    risk: dict[str, Any] = Field(default_factory=dict)
     vasp: dict[str, Any] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
     storage: dict[str, Any] = Field(default_factory=dict)

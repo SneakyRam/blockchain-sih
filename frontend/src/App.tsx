@@ -11,8 +11,15 @@ import { DetailPanel } from './components/DetailPanel'
 import { TransactionTable } from './components/TransactionTable'
 import { FilterBar, type Filters } from './components/FilterBar'
 import { filterTransactions } from './filtering'
-import { investigate, loadGraph, graphStatus } from './api'
-import type { GraphPayload, InvestigationInput, InvestigationResult } from './types'
+import { investigate, loadGraph, graphStatus, providerDiagnostics, authStatus, currentUser as fetchCurrentUser, logout as apiLogout } from './api'
+import type {
+  GraphPayload,
+  GraphStatusResult,
+  AuthStatusResult,
+  InvestigationInput,
+  InvestigationResult,
+  ProviderDiagnosticsResult,
+} from './types'
 import './styles.css'
 
 const initialFilters: Filters = {
@@ -73,9 +80,8 @@ export default function App() {
   const [hasSeenSplash, setHasSeenSplash] = useState<boolean>(() => {
     return sessionStorage.getItem('cryptotrace_splash') === 'true'
   })
-  const [currentUser, setCurrentUser] = useState<string | null>(() => {
-    return localStorage.getItem('cryptotrace_user')
-  })
+  const [currentUser, setCurrentUser] = useState<string | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [currentRoute, setCurrentRoute] = useState<string>('dashboard')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('cryptotrace_theme') as 'dark' | 'light') || 'dark'
@@ -84,6 +90,12 @@ export default function App() {
   // Forensic Investigation State
   const [result, setResult] = useState<InvestigationResult | null>(null)
   const [graph, setGraph] = useState<GraphPayload | null>(null)
+  const [backendConnected, setBackendConnected] = useState(false)
+  const [backendError, setBackendError] = useState('')
+  const [neo4jStatus, setNeo4jStatus] = useState<GraphStatusResult | null>(null)
+  const [providerStatus, setProviderStatus] = useState<ProviderDiagnosticsResult | null>(null)
+  const [databaseStatus, setDatabaseStatus] = useState<AuthStatusResult | null>(null)
+  const [infrastructureLoading, setInfrastructureLoading] = useState(true)
   const [filters, setFilters] = useState<Filters>(initialFilters)
   const [selectedNode, setSelectedNode] = useState<Record<string, unknown> | null>(null)
   const [isInvestigating, setIsInvestigating] = useState(false)
@@ -97,6 +109,76 @@ export default function App() {
     localStorage.setItem('cryptotrace_theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    let cancelled = false
+    fetchCurrentUser()
+      .then(({ user }) => {
+        if (cancelled) return
+        setCurrentUser(user.email)
+        localStorage.setItem('cryptotrace_user', user.email)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setCurrentUser(null)
+        localStorage.removeItem('cryptotrace_user')
+      })
+      .finally(() => {
+        if (!cancelled) setAuthLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadInfrastructureStatus = async () => {
+      setInfrastructureLoading(true)
+      setBackendError('')
+
+      try {
+        const [graphResult, diagnosticsResult, databaseResult] = await Promise.allSettled([
+          graphStatus(),
+          providerDiagnostics(),
+          authStatus(),
+        ])
+
+        if (cancelled) return
+
+        if (graphResult.status === 'fulfilled') {
+          setBackendConnected(true)
+          setNeo4jStatus(graphResult.value)
+        } else {
+          setBackendConnected(false)
+          setBackendError(graphResult.reason instanceof Error ? graphResult.reason.message : 'Backend unavailable')
+          setNeo4jStatus(null)
+        }
+
+        if (diagnosticsResult.status === 'fulfilled') {
+          setProviderStatus(diagnosticsResult.value)
+        } else {
+          setProviderStatus(null)
+        }
+
+        if (databaseResult.status === 'fulfilled') {
+          setDatabaseStatus(databaseResult.value)
+        } else {
+          setDatabaseStatus(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setInfrastructureLoading(false)
+        }
+      }
+    }
+
+    void loadInfrastructureStatus()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const toggleTheme = () => {
     setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'))
   }
@@ -108,10 +190,12 @@ export default function App() {
 
   const handleLoginSuccess = (email: string) => {
     setCurrentUser(email)
+    setAuthLoading(false)
     localStorage.setItem('cryptotrace_user', email)
   }
 
   const handleLogout = () => {
+    void apiLogout().catch(() => undefined)
     setCurrentUser(null)
     localStorage.removeItem('cryptotrace_user')
   }
@@ -147,9 +231,9 @@ export default function App() {
           id: data.investigation_id || `tr_${Date.now().toString().slice(-6)}`,
           address: data.address,
           chain: data.chain,
-          risk: 'HIGH',
-          score: 82,
-          exchange: 'Binance',
+          risk: data.risk?.level ?? 'MEDIUM',
+          score: data.risk?.score ?? 0,
+          exchange: String(((data.vasp?.target as Record<string, any> | undefined)?.verdict as Record<string, any> | undefined)?.consensus ?? 'Unidentified'),
           time: 'Just now',
         },
         ...prev.slice(0, 7),
@@ -162,53 +246,9 @@ export default function App() {
           setGraph(neoGraph)
         }
       }
-    } catch (err: any) {
-      console.warn('Live investigation error, creating structured fallback telemetry:', err)
-      // Provide robust fallback result so UI renders beautifully even if external RPC/Etherscan is throttled
-      const mockId = `INV-${Date.now().toString().slice(-6)}`
-      const mockResult: InvestigationResult = {
-        investigation_id: mockId,
-        address,
-        chain: chain === 'auto' ? 'ethereum' : chain,
-        queried_at: new Date().toISOString(),
-        wallet: { address, chain },
-        normalized: {
-          transactions: [
-            {
-              event_id: 'ev_01',
-              tx_hash: '0x8b32e140d75a89f92e4',
-              amount: '12,500',
-              asset: 'USDT',
-              direction: 'outbound',
-              from_address: address,
-              to_address: '0x28C6c06298d514Db089934071355E5743bf21d60',
-              hop_level: 1,
-              timestamp: Date.now() - 3600000,
-            },
-            {
-              event_id: 'ev_02',
-              tx_hash: '0x49f2b8109d31ac0981b',
-              amount: '4,200',
-              asset: 'USDT',
-              direction: 'outbound',
-              from_address: '0x28C6c06298d514Db089934071355E5743bf21d60',
-              to_address: '0x564286362092D8e7936905494a861cf143d2c91',
-              hop_level: 2,
-              timestamp: Date.now() - 1800000,
-            },
-          ],
-        },
-        vasp: {
-          target: {
-            verdict: {
-              state: 'identified',
-              consensus: 'Binance Deposit Cluster',
-              confidence: 'high',
-            },
-          },
-        },
-      }
-      setResult(mockResult)
+    } catch (err: unknown) {
+      setInvestigationError(err instanceof Error ? err.message : 'Investigation backend unavailable')
+      setCurrentRoute('dashboard')
     } finally {
       setIsInvestigating(false)
     }
@@ -217,6 +257,10 @@ export default function App() {
   // 1. Show Splash screen first time
   if (!hasSeenSplash) {
     return <SplashScreen onFinish={handleSplashFinish} />
+  }
+
+  if (authLoading) {
+    return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}>Checking investigator session...</div>
   }
 
   // 2. Auth Gateway: Show Login if not signed in
@@ -261,6 +305,13 @@ export default function App() {
           <Dashboard
             onStartTrace={(addr, chain, bridge) => handleStartTrace(addr, chain, bridge)}
             recentTraces={recentTraces}
+            apiConnected={backendConnected}
+            apiError={backendError}
+            graphStatus={neo4jStatus}
+            diagnostics={providerStatus}
+            databaseStatus={databaseStatus}
+            infrastructureLoading={infrastructureLoading}
+            investigationError={investigationError}
           />
         )}
 

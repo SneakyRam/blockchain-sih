@@ -1,8 +1,17 @@
-import type { GraphPayload, InvestigationInput, InvestigationResult } from './types'
+import type {
+  GraphPayload,
+  GraphStatusResult,
+  InvestigationInput,
+  InvestigationResult,
+  ProviderDiagnosticsResult,
+  AuthUser,
+  AuthStatusResult,
+} from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+    credentials: 'include',
     ...init,
   })
   const payload = await response.json().catch(() => ({}))
@@ -36,8 +45,8 @@ export function loadGraph(investigationId: string): Promise<GraphPayload> {
   return request<GraphPayload>(`/api/v1/graph/${encodeURIComponent(investigationId)}`)
 }
 
-export function graphStatus(): Promise<{ status: string; driver?: string; nodes?: number }> {
-  return request<{ status: string }>('/api/v1/graph/status')
+export function graphStatus(): Promise<GraphStatusResult> {
+  return request<GraphStatusResult>('/api/v1/graph/status')
 }
 
 export function checkVASP(address: string, chain = 'auto', forceRefresh = false) {
@@ -49,4 +58,34 @@ export function checkVASP(address: string, chain = 'auto', forceRefresh = false)
 
 export function getProviderConfig() {
   return request<Record<string, unknown>>('/api/v1/provider-config')
+}
+
+export function providerDiagnostics(): Promise<ProviderDiagnosticsResult> {
+  return request<ProviderDiagnosticsResult>('/api/v1/provider-diagnostics', {
+    method: 'POST',
+    body: '{}',
+  })
+}
+
+export function login(email: string, password: string): Promise<{ status: string; user: AuthUser }> {
+  return request<{ status: string; user: AuthUser }>('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function currentUser(): Promise<{ status: string; user: AuthUser }> {
+  return request<{ status: string; user: AuthUser }>('/api/v1/auth/me')
+}
+
+export async function logout(): Promise<void> {
+  await request<{ status: string }>('/api/v1/auth/logout', { method: 'POST', body: '{}' })
+}
+
+export function googleLoginUrl(): string {
+  return '/api/v1/auth/google/start'
+}
+
+export function authStatus(): Promise<AuthStatusResult> {
+  return request<AuthStatusResult>('/api/v1/auth/status')
 }

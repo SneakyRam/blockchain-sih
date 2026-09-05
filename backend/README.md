@@ -34,6 +34,16 @@ API documentation: `http://127.0.0.1:8000/docs`.
 - `GET /api/v1/graph/{investigation_id}` returns graph nodes and relationships.
 - `GET /api/v1/graph/neighbors` returns bounded graph neighbors.
 - `GET /api/v1/graph/path` returns a bounded shortest path.
+- `POST /api/v1/provider-diagnostics` returns a provider status matrix.
+
+## Authentication and PostgreSQL
+
+- `POST /api/v1/auth/login` authenticates the bootstrap `ADMIN_EMAIL` or another password user in PostgreSQL.
+- `GET /api/v1/auth/google/start` and `/api/v1/auth/google/callback` provide Google OAuth with an HttpOnly signed session cookie.
+- `GET /api/v1/auth/me` returns the current session; `POST /api/v1/auth/logout` clears it.
+- `GET /api/v1/auth/status` reports PostgreSQL, Google OAuth, session configuration, and active users in the last 30 days.
+
+The API creates `investigator_users` and `investigator_audit_log` on startup. Configure `DATABASE_URL`, `SESSION_SECRET`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in a private `.env`; use [sql/001_auth.sql](sql/001_auth.sql) when a database administrator needs to apply the schema manually. Google Cloud Console must use the callback URL from `GOOGLE_REDIRECT_URI`.
 
 ## Verification
 

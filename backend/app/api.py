@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+import secrets
+
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi.responses import RedirectResponse
 
 from app.config import get_settings
 from app.core.address import detect_chain, normalize_chain, validate_for_chain
-from app.schemas.models import GraphSyncRequest, InvestigationRequest, VASPCheckRequest
+from app.schemas.models import GraphSyncRequest, InvestigationRequest, LoginRequest, VASPCheckRequest
+from app.auth.service import AuthenticationError, AuthenticationUnavailable, get_auth_service
 from app.graph.service import get_graph_service
 from app.storage.json_store import load_normalized_snapshot
+from app.services.diagnostics import ProviderDiagnosticsService
 from app.services.investigation import InvestigationService
 from app.vasp.service import VASPService
 
@@ -214,3 +219,100 @@ async def provider_config():
         "vasp_providers": settings.vasp_provider_list,
         "cors_origins": settings.cors_origin_list,
     }
+
+
+@router.post("/provider-diagnostics")
+async def provider_diagnostics():
+    return await ProviderDiagnosticsService(get_settings()).diagnose()
+
+
+def _set_session_cookie(response: Response, token: str) -> None:
+    settings = get_settings()
+    response.set_cookie(
+        settings.session_cookie_name,
+        token,
+        max_age=8 * 60 * 60,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+
+
+@router.post("/auth/login")
+async def auth_login(request: LoginRequest, response: Response):
+    try:
+        token, user = await get_auth_service().login(request.email, request.password)
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except AuthenticationUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    _set_session_cookie(response, token)
+    return {"status": "ok", "user": user}
+
+
+@router.get("/auth/me")
+async def auth_me(request: Request):
+    session = get_auth_service().decode_session(request.cookies.get(get_settings().session_cookie_name))
+    if not session:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return {"status": "ok", "user": {"id": session["sub"], "email": session["email"], "role": session.get("role", "investigator")}}
+
+
+@router.post("/auth/logout")
+async def auth_logout(response: Response):
+    response.delete_cookie(get_settings().session_cookie_name, path="/")
+    return {"status": "ok"}
+
+
+@router.get("/auth/status")
+async def auth_status():
+    service = get_auth_service()
+    database = await service.startup()
+    active_users = None
+    if database.get("status") == "ok":
+        import asyncio
+
+        active_users = await asyncio.to_thread(service.repository.active_user_count)
+    return {
+        "status": "ok",
+        "database": database,
+        "database_configured": bool(get_settings().database_url or get_settings().postgres_password),
+        "driver_available": service.repository.driver_available,
+        "active_users_last_30_days": active_users,
+        "google_oauth_configured": bool(get_settings().google_client_id and get_settings().google_client_secret),
+        "session_configured": bool(get_settings().session_secret),
+    }
+
+
+@router.get("/auth/google/start")
+async def google_start():
+    state = secrets.token_urlsafe(32)
+    try:
+        url = get_auth_service().google_start_url(state)
+    except AuthenticationUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    redirect = RedirectResponse(url, status_code=307)
+    settings = get_settings()
+    redirect.set_cookie("sih26183_oauth_state", state, max_age=600, httponly=True, secure=settings.session_cookie_secure, samesite="lax", path="/")
+    return redirect
+
+
+@router.get("/auth/google/callback")
+async def google_callback(request: Request, code: str = "", state: str = ""):
+    expected = request.cookies.get("sih26183_oauth_state")
+    if not state or not expected or not secrets.compare_digest(state, expected):
+        raise HTTPException(status_code=400, detail="Invalid Google OAuth state")
+    if not code:
+        raise HTTPException(status_code=400, detail="Google authorization code is missing")
+    try:
+        token, _ = await get_auth_service().google_login(code)
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except AuthenticationUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    settings = get_settings()
+    redirect = RedirectResponse(f"{settings.frontend_url.rstrip('/')}/?auth=success", status_code=303)
+    _set_session_cookie(redirect, token)
+    redirect.delete_cookie("sih26183_oauth_state", path="/")
+    return redirect

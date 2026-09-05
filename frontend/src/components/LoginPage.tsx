@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Shield, Lock, Mail, ArrowRight, CheckCircle2, Terminal } from 'lucide-react'
+import { googleLoginUrl, login } from '../api'
 
 export function LoginPage({ onLoginSuccess }: { onLoginSuccess: (email: string) => void }) {
   const [email, setEmail] = useState('admin@i4c.gov.in')
@@ -8,22 +9,20 @@ export function LoginPage({ onLoginSuccess }: { onLoginSuccess: (email: string) 
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setErrorMsg('')
 
-    setTimeout(() => {
-      // Mock / Auth verification
-      if (email.trim() && password === 'cryptotrace') {
-        onLoginSuccess(email)
-      } else {
-        setShake(true)
-        setErrorMsg('Invalid credentials. (Hint: password is "cryptotrace")')
-        setTimeout(() => setShake(false), 500)
-        setLoading(false)
-      }
-    }, 600)
+    try {
+      const result = await login(email, password)
+      onLoginSuccess(result.user.email)
+    } catch (error) {
+      setShake(true)
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to authenticate')
+      window.setTimeout(() => setShake(false), 500)
+      setLoading(false)
+    }
   }
 
   return (
@@ -224,8 +223,8 @@ export function LoginPage({ onLoginSuccess }: { onLoginSuccess: (email: string) 
                 <label style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-secondary)' }}>
                   Password
                 </label>
-                <span style={{ fontSize: '0.75rem', color: 'var(--primary)', cursor: 'pointer' }}>
-                  Default: cryptotrace
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Managed by PostgreSQL
                 </span>
               </div>
               <div style={{ position: 'relative' }}>
@@ -292,7 +291,7 @@ export function LoginPage({ onLoginSuccess }: { onLoginSuccess: (email: string) 
 
             <button
               type="button"
-              onClick={() => onLoginSuccess('officer@i4c.gov.in')}
+              onClick={() => { window.location.href = googleLoginUrl() }}
               className="btn-cyber-secondary"
               style={{ width: '100%', justifyContent: 'center' }}
             >
