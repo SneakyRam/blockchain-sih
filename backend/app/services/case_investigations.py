@@ -49,7 +49,7 @@ class CaseInvestigationService:
         result["attribution"] = self.attribution.evaluate(request.address, chain, result.get("vasp") or {})
         threat_intel = self.repository.list_threat_intel(case_id, request.address, chain)
         result["threat_intel"] = threat_intel
-        result["risk"] = self.risk_fusion.evaluate(result.get("risk") or {}, findings, threat_intel)
+        result["risk"] = self.risk_fusion.evaluate(result.get("risk") or {}, findings, threat_intel, result["attribution"])
         run = self.repository.complete_investigation_run(run_id, result)
         self.repository.replace_findings(run_id, findings)
         self.repository.upsert_risk_assessment(run_id, result["risk"])

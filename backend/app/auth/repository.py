@@ -537,6 +537,30 @@ class PostgresRepository:
             row = cursor.fetchone()
             return {"id": row[0], "case_id": case_id, "investigation_id": run_id, "format": row[1], "content": row[2], "created_by": row[3], "created_at": row[4].isoformat()}
 
+    def list_reports(self, case_id: str, run_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        with self._connect() as connection, connection.cursor() as cursor:
+            if run_id:
+                cursor.execute(
+                    "SELECT id, investigation_id, format, created_by, created_at FROM investigation_reports WHERE case_id = %s AND investigation_id = %s ORDER BY created_at DESC LIMIT %s",
+                    (case_id, run_id, limit),
+                )
+            else:
+                cursor.execute(
+                    "SELECT id, investigation_id, format, created_by, created_at FROM investigation_reports WHERE case_id = %s ORDER BY created_at DESC LIMIT %s",
+                    (case_id, limit),
+                )
+            return [
+                {
+                    "id": row[0],
+                    "case_id": case_id,
+                    "investigation_id": row[1],
+                    "format": row[2],
+                    "created_by": row[3],
+                    "created_at": row[4].isoformat(),
+                }
+                for row in cursor.fetchall()
+            ]
+
     def get_report(self, case_id: str, run_id: str, report_id: str) -> dict[str, Any] | None:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT id, format, content, created_by, created_at FROM investigation_reports WHERE id = %s AND case_id = %s AND investigation_id = %s", (report_id, case_id, run_id))

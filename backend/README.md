@@ -53,17 +53,28 @@ API documentation: `http://127.0.0.1:8000/docs`.
 - `GET /api/v1/cases/{case_id}/investigations/{run_id}/findings` returns
   deterministic, evidence-linked typology findings.
 - `GET /api/v1/cases/{case_id}/investigations/{run_id}/risk` returns the
-  decomposable fused risk assessment and its evidence-linked factors.
+  decomposable fused risk assessment and its evidence-linked factors, including
+  confidence-weighted provider attribution when available.
 - `GET /api/v1/cases/{case_id}/investigations/{run_id}/attribution` returns
   the provider-backed entity assessment, confidence, and source evidence.
 - `GET /api/v1/cases/{case_id}/investigations/{run_id}/evidence` returns
   captured snapshot artifacts with SHA-256 integrity hashes.
-- `POST /api/v1/cases/{case_id}/investigations/{run_id}/reports` builds an
-  evidence-first JSON report; `GET .../reports/{report_id}` retrieves it.
+- `POST /api/v1/cases/{case_id}/investigations/{run_id}/reports` creates an
+  evidence-first JSON report with chain-of-custody audit trail; 
+  `GET .../reports/{report_id}` retrieves it; 
+  `GET .../reports` lists reports for that investigation.
+- `GET /api/v1/cases/{case_id}/reports` lists all reports for a case.
 - `GET /api/v1/cases/{case_id}/alerts` lists evidence-linked open or resolved
   risk alerts for the case.
 - `POST` / `GET /api/v1/cases/{case_id}/threat-intelligence` manage
   provenance-preserving intelligence records used by case-scoped risk fusion.
+
+Reports are structured evidence-first documents with:
+- Immutable captured artifacts linked by SHA-256 hashes.
+- Rule-based findings with supporting transaction event IDs.
+- Confidence-weighted risk factors from baseline, typology, threat intelligence, and attribution.
+- Provider-backed entity assessments with sources and evidence.
+- Comprehensive disclaimers and audit trail.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the AS-IS assessment,
 target architecture, evidence boundary, and phased implementation plan.

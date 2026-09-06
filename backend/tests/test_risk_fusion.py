@@ -11,3 +11,22 @@ def test_fusion_keeps_baseline_and_explains_rule_contribution():
     assert assessment["factors"][0]["points"] == 50
     assert assessment["factors"][1]["points"] == 14
     assert assessment["evidence_event_ids"] == ["tx-1", "tx-2"]
+
+
+def test_fusion_adds_confidence_weighted_provider_attribution():
+    assessment = RiskFusionEngine().evaluate(
+        {"score": 40, "method": "explainable_baseline_v1"},
+        [],
+        attribution={
+            "state": "confirmed",
+            "confidence": 0.9,
+            "entity": "Exchange X",
+            "sources": ["provider-a", "provider-b"],
+            "provider_verdict_state": "identified",
+            "explanation": "Provider evidence supports a confirmed attribution to Exchange X.",
+        },
+    )
+    attribution_factors = [factor for factor in assessment["factors"] if factor["source"] == "attribution"]
+    assert assessment["score"] == 54
+    assert attribution_factors[0]["points"] == 14
+    assert attribution_factors[0]["provenance"]["entity"] == "Exchange X"

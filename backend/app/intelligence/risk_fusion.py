@@ -12,8 +12,15 @@ class RiskFusionEngine:
 
     finding_weights = {"fan_out": {"medium": 10, "high": 15}, "rapid_movement": {"medium": 12, "high": 18}}
     threat_intel_weights = {"sanctions": 30, "scam": 25, "phishing": 20, "mixer": 18, "exploit": 22, "analyst_label": 8}
+    attribution_weights = {"confirmed": 15, "probable": 10, "possible": 5}
 
-    def evaluate(self, baseline: dict[str, Any], findings: list[dict[str, Any]], threat_intel: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    def evaluate(
+        self,
+        baseline: dict[str, Any],
+        findings: list[dict[str, Any]],
+        threat_intel: list[dict[str, Any]] | None = None,
+        attribution: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         baseline_score = int(baseline.get("score") or 0)
         factors = [{
             "source": "baseline", "id": baseline.get("method", "explainable_baseline_v1"),
@@ -52,6 +59,25 @@ class RiskFusionEngine:
                 "points": points, "confidence": confidence,
                 "explanation": f"{record.get('label', category)} reported by {record.get('source', 'an intelligence source')}.",
                 "provenance": {"source_url": record.get("source_url", ""), "reference": record.get("reference", "")},
+            })
+        attribution_data = attribution or {}
+        attribution_state = str(attribution_data.get("state") or "")
+        attribution_weight = self.attribution_weights.get(attribution_state, 0)
+        attribution_confidence = max(0.0, min(1.0, float(attribution_data.get("confidence") or 0)))
+        attribution_points = round(attribution_weight * attribution_confidence)
+        if attribution_points:
+            additions += attribution_points
+            factors.append({
+                "source": "attribution",
+                "id": "provider_attribution",
+                "points": attribution_points,
+                "confidence": attribution_confidence,
+                "explanation": attribution_data.get("explanation", "Provider-backed attribution signal."),
+                "provenance": {
+                    "entity": attribution_data.get("entity", ""),
+                    "sources": attribution_data.get("sources", []),
+                    "provider_verdict_state": attribution_data.get("provider_verdict_state", ""),
+                },
             })
         score = min(100, baseline_score + additions)
         return {

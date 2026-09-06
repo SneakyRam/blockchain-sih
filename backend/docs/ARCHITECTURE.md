@@ -87,9 +87,12 @@ not proof of criminal identity; future rules and ML signals follow the same
 finding contract.
 
 Risk fusion preserves the original baseline as a named factor and adds only
-configured, confidence-weighted typology contributions. The response stores the
-score, each point contribution, explanation, and evidence references, so an
-investigator can inspect how a prioritization result was produced.
+configured, confidence-weighted typology, threat-intelligence, and provider
+attribution contributions. The response stores the score, each point
+contribution, explanation, and evidence references, so an investigator can
+inspect how a prioritization result was produced. Attribution contributes only
+when the provider assessment is confirmed, probable, or possible; unknown and
+conflicting provider results do not increase the score.
 
 Threat-intelligence records are case-scoped and retain category, source, URL,
 reference, label, and confidence. Fusion uses only the strongest record per
@@ -119,18 +122,17 @@ provider calls, or arbitrary URLs.
 
 ## Delivery plan
 
-1. **Operational foundation (in progress):** cases, targets, validation, audit
-   events, and case APIs.
-2. **Core investigation:** link runs and snapshots to cases; introduce canonical
+1. ✅ **Operational foundation:** cases, targets, validation, audit events, and case APIs.
+2. ✅ **Core investigation:** link runs and snapshots to cases; introduce canonical
    transaction-event persistence.
-3. **Intelligence:** versioned typology rules, threat intelligence,
+3. ✅ **Intelligence:** versioned typology rules, threat intelligence,
    evidence-backed attribution, and explainable risk fusion.
-4. **Realtime and cross-chain:** Redis workers, incremental updates, WebSocket
+4. ✅ **Evidence and reporting:** immutable artifacts (SHA-256 verified), evidence-first
+   JSON reports with chain-of-custody audit trails, and export capability.
+5. **Realtime and cross-chain:** Redis workers, incremental updates, WebSocket
    events, and confidence-scored bridge links.
-5. **ML and AI:** feature pipeline, replaceable inference, and an
+6. **ML and AI:** feature pipeline, replaceable inference, and an
    evidence-grounded copilot.
-6. **Evidence and reporting:** immutable artifacts, chain of custody, JSON/PDF
-   reports, and export bundles.
 
 ## Non-goals for the MVP
 

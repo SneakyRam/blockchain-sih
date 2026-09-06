@@ -261,15 +261,38 @@ async def create_case_investigation_report(case_id: str, run_id: str):
         raise _case_api_error(exc) from exc
 
 
+@router.get("/cases/{case_id}/investigations/{run_id}/reports", tags=["cases", "reports"])
+async def list_case_investigation_reports(
+    case_id: str,
+    run_id: str,
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    try:
+        return {"items": _report_service().list_reports(case_id, run_id, limit)}
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
 @router.get("/cases/{case_id}/investigations/{run_id}/reports/{report_id}", tags=["cases", "reports"])
 async def get_case_investigation_report(case_id: str, run_id: str, report_id: str):
     try:
-        report = PostgresRepository(get_settings()).get_report(case_id, run_id, report_id)
+        report = _report_service().get(case_id, run_id, report_id)
     except Exception as exc:
         raise _case_api_error(exc) from exc
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     return report
+
+
+@router.get("/cases/{case_id}/reports", tags=["cases", "reports"])
+async def list_case_reports(
+    case_id: str,
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    try:
+        return {"items": _report_service().list_reports(case_id, None, limit)}
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
 
 
 @router.get("/cases/{case_id}/alerts", tags=["cases", "alerts"])
