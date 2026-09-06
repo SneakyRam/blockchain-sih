@@ -137,12 +137,12 @@ class InvestigationService:
                     counts[candidate] += 1
         return [{"address": addr, "count": count} for addr, count in counts.most_common()]
 
-    async def investigate(self, request: InvestigationRequest) -> dict[str, Any]:
+    async def investigate(self, request: InvestigationRequest, investigation_id: str | None = None) -> dict[str, Any]:
         chain = self.resolve_chain(request)
         limit = request.max_records or self.settings.max_records
         page_size = request.page_size or self.settings.page_size
         max_pages = request.max_pages or self.settings.max_pages
-        investigation_id = uuid4().hex
+        investigation_id = investigation_id or uuid4().hex
         queried_at = datetime.now(timezone.utc).isoformat()
 
         provider_status: dict[str, Any] = {}

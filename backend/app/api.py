@@ -7,12 +7,17 @@ from fastapi.responses import RedirectResponse
 
 from app.config import get_settings
 from app.core.address import detect_chain, normalize_chain, validate_for_chain
-from app.schemas.models import GraphSyncRequest, InvestigationRequest, LoginRequest, VASPCheckRequest
+from app.schemas.models import CaseCreateRequest, CaseUpdateRequest, GraphSyncRequest, InvestigationRequest, LoginRequest, ThreatIntelCreateRequest, VASPCheckRequest
 from app.auth.service import AuthenticationError, AuthenticationUnavailable, get_auth_service
+from app.auth.repository import PostgresRepository
 from app.graph.service import get_graph_service
 from app.storage.json_store import load_normalized_snapshot
 from app.services.diagnostics import ProviderDiagnosticsService
 from app.services.investigation import InvestigationService
+from app.services.cases import CaseService
+from app.services.case_investigations import CaseInvestigationService
+from app.services.threat_intelligence import ThreatIntelService
+from app.reports.service import ReportService
 from app.vasp.service import VASPService
 
 
@@ -72,6 +77,209 @@ QUERY_LAYERS = {
         "vasp_enrichment_separate",
     ],
 }
+
+
+def _case_service() -> CaseService:
+    return CaseService(PostgresRepository(get_settings()))
+
+
+def _case_investigation_service() -> CaseInvestigationService:
+    settings = get_settings()
+    return CaseInvestigationService(settings, PostgresRepository(settings))
+
+
+def _threat_intel_service() -> ThreatIntelService:
+    return ThreatIntelService(PostgresRepository(get_settings()))
+
+
+def _report_service() -> ReportService:
+    return ReportService(PostgresRepository(get_settings()))
+
+
+def _case_api_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=422, detail=str(exc))
+    return HTTPException(status_code=503, detail="Case storage is unavailable")
+
+
+@router.post("/cases", status_code=201, tags=["cases"])
+async def create_case(payload: CaseCreateRequest):
+    try:
+        return _case_service().create(payload)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.get("/cases", tags=["cases"])
+async def list_cases(limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0)):
+    try:
+        return _case_service().list(limit, offset)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.get("/cases/{case_id}", tags=["cases"])
+async def get_case(case_id: str):
+    try:
+        case = _case_service().get(case_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+@router.patch("/cases/{case_id}", tags=["cases"])
+async def update_case(case_id: str, payload: CaseUpdateRequest):
+    try:
+        case = _case_service().update(case_id, payload)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+    return case
+
+
+@router.post("/cases/{case_id}/threat-intelligence", status_code=201, tags=["cases", "intelligence"])
+async def create_threat_intelligence(case_id: str, payload: ThreatIntelCreateRequest):
+    try:
+        return _threat_intel_service().create(case_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.get("/cases/{case_id}/threat-intelligence", tags=["cases", "intelligence"])
+async def list_threat_intelligence(case_id: str):
+    try:
+        return {"items": _threat_intel_service().list(case_id)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.post("/cases/{case_id}/investigations", tags=["cases", "investigations"])
+async def run_case_investigation(case_id: str, payload: InvestigationRequest):
+    try:
+        return await _case_investigation_service().run(case_id, payload)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.get("/cases/{case_id}/investigations", tags=["cases", "investigations"])
+async def list_case_investigations(case_id: str, limit: int = Query(default=50, ge=1, le=100)):
+    try:
+        return {"items": _case_investigation_service().list(case_id, limit)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}", tags=["cases", "investigations"])
+async def get_case_investigation(case_id: str, run_id: str):
+    try:
+        run = _case_investigation_service().get(case_id, run_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if not run:
+        raise HTTPException(status_code=404, detail="Investigation run not found")
+    return run
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}/transactions", tags=["cases", "investigations"])
+async def list_case_investigation_transactions(
+    case_id: str,
+    run_id: str,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    try:
+        events = _case_investigation_service().transactions(case_id, run_id, limit, offset)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if events is None:
+        raise HTTPException(status_code=404, detail="Investigation run not found")
+    return events
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}/findings", tags=["cases", "intelligence"])
+async def list_case_investigation_findings(case_id: str, run_id: str):
+    try:
+        findings = _case_investigation_service().findings(case_id, run_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if findings is None:
+        raise HTTPException(status_code=404, detail="Investigation run not found")
+    return {"items": findings}
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}/risk", tags=["cases", "intelligence"])
+async def get_case_investigation_risk(case_id: str, run_id: str):
+    try:
+        assessment = _case_investigation_service().risk(case_id, run_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Risk assessment not found")
+    return assessment
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}/attribution", tags=["cases", "intelligence"])
+async def get_case_investigation_attribution(case_id: str, run_id: str):
+    try:
+        assessment = _case_investigation_service().attribution_assessment(case_id, run_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Attribution assessment not found")
+    return assessment
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}/evidence", tags=["cases", "evidence"])
+async def list_case_investigation_evidence(case_id: str, run_id: str):
+    try:
+        artifacts = _case_investigation_service().evidence(case_id, run_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if artifacts is None:
+        raise HTTPException(status_code=404, detail="Investigation run not found")
+    return {"items": artifacts}
+
+
+@router.post("/cases/{case_id}/investigations/{run_id}/reports", status_code=201, tags=["cases", "reports"])
+async def create_case_investigation_report(case_id: str, run_id: str):
+    try:
+        return _report_service().create(case_id, run_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+
+
+@router.get("/cases/{case_id}/investigations/{run_id}/reports/{report_id}", tags=["cases", "reports"])
+async def get_case_investigation_report(case_id: str, run_id: str, report_id: str):
+    try:
+        report = PostgresRepository(get_settings()).get_report(case_id, run_id, report_id)
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return report
+
+
+@router.get("/cases/{case_id}/alerts", tags=["cases", "alerts"])
+async def list_case_alerts(case_id: str, status: str = Query(default="open", pattern="^(open|resolved)$")):
+    try:
+        return {"items": _case_investigation_service().alerts(case_id, status)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _case_api_error(exc) from exc
 
 
 @router.get("/resolve")

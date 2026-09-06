@@ -34,6 +34,44 @@ class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=1, max_length=256)
 
+
+class CaseTargetInput(BaseModel):
+    address: str = Field(min_length=1, max_length=256)
+    chain: str = Field(min_length=1, max_length=32)
+    role: str = Field(default="suspect", pattern="^(suspect|victim|destination|related)$")
+    label: str = Field(default="", max_length=200)
+
+
+class CaseCreateRequest(BaseModel):
+    case_reference: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=240)
+    priority: str = Field(default="medium", pattern="^(low|medium|high|critical)$")
+    fraud_type: str = Field(default="", max_length=120)
+    complaint_reference: str = Field(default="", max_length=120)
+    victim_reference: str = Field(default="", max_length=120)
+    description: str = Field(default="", max_length=5000)
+    targets: list[CaseTargetInput] = Field(default_factory=list, max_length=50)
+
+
+class CaseUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=240)
+    status: str | None = Field(default=None, pattern="^(open|in_progress|closed|archived)$")
+    priority: str | None = Field(default=None, pattern="^(low|medium|high|critical)$")
+    fraud_type: str | None = Field(default=None, max_length=120)
+    description: str | None = Field(default=None, max_length=5000)
+
+
+class ThreatIntelCreateRequest(BaseModel):
+    address: str = Field(min_length=1, max_length=256)
+    chain: str = Field(min_length=1, max_length=32)
+    category: str = Field(pattern="^(sanctions|scam|phishing|mixer|exploit|bridge|exchange|analyst_label)$")
+    label: str = Field(min_length=1, max_length=240)
+    source: str = Field(min_length=1, max_length=160)
+    source_url: str = Field(default="", max_length=2000)
+    confidence: float = Field(default=0.5, ge=0, le=1)
+    reference: str = Field(default="", max_length=240)
+    notes: str = Field(default="", max_length=4000)
+
 class NormalizedTransaction(BaseModel):
     event_type: str | None = None
     event_id: str
