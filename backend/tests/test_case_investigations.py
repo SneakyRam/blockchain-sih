@@ -19,6 +19,25 @@ class FakeRepository:
         self.created.append((run_id, case_id, address, chain))
         return {"id": run_id, "status": "running"}
 
+    def get_investigation_run(self, case_id, run_id):
+        for created_run_id, created_case_id, address, chain in self.created:
+            if created_run_id == run_id and created_case_id == case_id:
+                return {
+                    "id": run_id,
+                    "case_id": case_id,
+                    "target_address": address,
+                    "chain": chain,
+                    "status": "running",
+                    "requested_at": "",
+                    "completed_at": None,
+                    "error_detail": "",
+                    "storage": {},
+                    "risk_score": None,
+                    "risk_level": "",
+                    "transaction_count": 0,
+                }
+        return None
+
     def complete_investigation_run(self, run_id, result):
         return {"id": run_id, "status": "completed", "risk_score": result["risk"]["score"]}
 
@@ -67,7 +86,7 @@ def test_case_investigation_requires_a_registered_target_and_persists_run():
     assert repo.findings[1] == []
     assert repo.assessment[1]["method"] == "explainable_risk_fusion_v1"
     assert repo.attribution[1]["state"] == "unknown"
-    assert [audit[1] for audit in repo.audits] == ["investigation.started", "investigation.completed"]
+    assert [audit[1] for audit in repo.audits] == ["investigation.queued", "investigation.completed"]
 
 
 def test_case_investigation_rejects_unknown_case_and_unregistered_target():

@@ -391,10 +391,29 @@ class PostgresRepository:
     def create_investigation_run(self, run_id: str, case_id: str, address: str, chain: str) -> dict[str, Any]:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO investigation_runs (id, case_id, target_address, chain) VALUES (%s, %s, %s, %s) RETURNING id, case_id, target_address, chain, status, requested_at, completed_at, error_detail, snapshot_paths, risk_score, risk_level, transaction_count",
+                "INSERT INTO investigation_runs (id, case_id, target_address, chain, status) VALUES (%s, %s, %s, %s, 'queued') RETURNING id, case_id, target_address, chain, status, requested_at, completed_at, error_detail, snapshot_paths, risk_score, risk_level, transaction_count",
                 (run_id, case_id, address, chain),
             )
             return self._run(cursor.fetchone())
+
+    def mark_investigation_running(self, run_id: str) -> bool:
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE investigation_runs
+                SET status = 'running'
+                WHERE id = %s
+                  AND status = 'queued'
+                """,
+                (run_id,),
+            )
+
+            changed = cursor.rowcount == 1
+
+            if changed:
+                connection.commit()
+
+            return changed
 
     def complete_investigation_run(self, run_id: str, result: dict[str, Any]) -> dict[str, Any] | None:
         import json

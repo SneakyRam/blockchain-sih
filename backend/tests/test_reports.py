@@ -186,7 +186,8 @@ def test_report_service_creates_evidence_first_report():
     assert report["case_id"] == "case-1"
     assert report["investigation_id"] == "run-1"
     assert report["content"]["version"] == "2.0"
-    assert report["content"]["observed_evidence"]["artifacts"][0]["sha256"] == "a" * 64
+    assert report["content"]["observed_evidence"]["artifacts"][0]["integrity"]["hash_algorithm"] == "SHA-256"
+    assert report["content"]["observed_evidence"]["artifacts"][0]["integrity"]["hash_value"] == "a" * 64
     assert len(report["content"]["disclaimers"]) == 5
 
 

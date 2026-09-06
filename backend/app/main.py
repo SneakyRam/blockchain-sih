@@ -9,6 +9,7 @@ from app.api import router
 from app.config import get_settings
 from app.graph.service import get_graph_service
 from app.auth.service import get_auth_service
+from app.realtime.websocket import router as realtime_router
 
 
 @asynccontextmanager
@@ -29,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(realtime_router)
 
 
 @app.get("/")

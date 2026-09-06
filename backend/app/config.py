@@ -55,6 +55,24 @@ class Settings(BaseModel):
     neo4j_max_nodes: int = int(os.getenv("NEO4J_MAX_NODES", "10000"))
     neo4j_max_relationships: int = int(os.getenv("NEO4J_MAX_RELATIONSHIPS", "25000"))
     cors_origins: str = os.getenv("CORS_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")
+    redis_url: str = os.getenv(
+        "REDIS_URL",
+        "redis://127.0.0.1:6379/0",
+    )
+    redis_queue_name: str = os.getenv(
+        "REDIS_QUEUE_NAME",
+        "tracex",
+    )
+    redis_event_channel: str = os.getenv(
+        "REDIS_EVENT_CHANNEL",
+        "tracex.events",
+    )
+    redis_job_visibility_timeout: int = int(
+        os.getenv(
+            "REDIS_JOB_VISIBILITY_TIMEOUT",
+            "300",
+        )
+    )
 
     @property
     def vasp_provider_list(self) -> list[str]:

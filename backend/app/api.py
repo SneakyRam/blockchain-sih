@@ -19,6 +19,7 @@ from app.services.case_investigations import CaseInvestigationService
 from app.services.threat_intelligence import ThreatIntelService
 from app.reports.service import ReportService
 from app.vasp.service import VASPService
+from app.workers.dispatcher import JobDispatcher
 
 
 router = APIRouter(prefix="/api/v1", tags=["investigations"])
@@ -160,13 +161,71 @@ async def list_threat_intelligence(case_id: str):
         raise _case_api_error(exc) from exc
 
 
-@router.post("/cases/{case_id}/investigations", tags=["cases", "investigations"])
-async def run_case_investigation(case_id: str, payload: InvestigationRequest):
+@router.post(
+    "/cases/{case_id}/investigations",
+    status_code=202,
+    tags=["cases", "investigations"],
+)
+async def run_case_investigation(
+    case_id: str,
+    payload: InvestigationRequest,
+):
+    service = _case_investigation_service()
+    dispatcher = JobDispatcher()
+
     try:
-        return await _case_investigation_service().run(case_id, payload)
+        prepared = service.prepare(
+            case_id,
+            payload,
+        )
+
+        job_payload = {
+            "investigation_id": prepared["run_id"],
+            "request": payload.model_dump(),
+            "requested_by": None,
+        }
+
+        job = await dispatcher.dispatch(
+            job_type="run_investigation",
+            case_id=case_id,
+            payload=job_payload,
+            priority="normal",
+            retry_max=3,
+        )
+
+        return {
+            "status": "queued",
+            "investigation_id": prepared["run_id"],
+            "job_id": job["id"],
+            "case_id": case_id,
+            "address": prepared["address"],
+            "chain": prepared["chain"],
+        }
+
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=str(exc),
+        ) from exc
+
     except Exception as exc:
+        run_id = locals().get("prepared", {}).get("run_id")
+
+        if run_id:
+            try:
+                service.repository.fail_investigation_run(
+                    run_id,
+                    f"Failed to queue investigation: {exc}",
+                )
+            except Exception:
+                pass
+
         raise _case_api_error(exc) from exc
 
 
