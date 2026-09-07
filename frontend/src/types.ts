@@ -59,6 +59,14 @@ export type InvestigationResult = {
   address: string
   chain: string
   queried_at: string
+  // Fields present in backend payload but not in original type
+  case_id?: string
+  complaint_id?: string
+  fraud_type?: string
+  reported_amount?: string
+  reported_at?: string
+  victim_reference?: string
+  status?: string
   wallet?: Record<string, unknown>
   normalized?: {
     transactions?: Transaction[]
@@ -80,6 +88,8 @@ export type InvestigationResult = {
     method?: string
     model_ready?: boolean
     disclaimer?: string
+    /** Risk factor strings or rich objects from risk_fusion */
+    factors?: Array<string | { source?: string; id?: string; points?: number; confidence?: number; explanation?: string }>
   }
   errors?: string[]
   storage?: Record<string, string>
@@ -97,6 +107,7 @@ export type InvestigationInput = {
   include_vasp: boolean
   include_raw: boolean
   force_refresh: boolean
+  max_records?: number
 }
 
 export type ProviderDiagnostic = {

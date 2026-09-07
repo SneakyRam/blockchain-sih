@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import type { InvestigationResult, GraphPayload } from '../types';
+import type { InvestigationResult, GraphPayload, Transaction } from '../types';
 
 interface InvestigationContextState {
   activeInvestigation: InvestigationResult | null;
   activeGraph: GraphPayload | null;
   isLoading: boolean;
-  
+
   // Computed helpers
   caseId: string | null;
   investigationId: string | null;
@@ -14,6 +14,10 @@ interface InvestigationContextState {
   riskScore: number | null;
   riskLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | null;
   investigationStatus: string | null;
+
+  // Shortcut data accessors
+  transactions: Transaction[];
+  counterparties: Array<{ address: string; count: number }>;
 
   // Actions
   setInvestigation: (result: InvestigationResult | null, graph?: GraphPayload | null) => void;
@@ -39,20 +43,38 @@ export const InvestigationProvider: React.FC<{ children: ReactNode }> = ({ child
     setActiveGraph(graph);
   }, []);
 
+  const inv = activeInvestigation as (InvestigationResult & Record<string, unknown>) | null;
+
+  // Pull transactions from wherever the backend puts them
+  const transactions: Transaction[] = (
+    inv?.transactions ??
+    (inv?.normalized as Record<string, unknown> | undefined)?.transactions ??
+    []
+  ) as Transaction[];
+
+  const counterparties: Array<{ address: string; count: number }> = (
+    inv?.counterparties ??
+    (inv?.normalized as Record<string, unknown> | undefined)?.counterparties ??
+    []
+  ) as Array<{ address: string; count: number }>;
+
   const value: InvestigationContextState = {
     activeInvestigation,
     activeGraph,
     isLoading,
-    
+
     // Computed from activeInvestigation
-    caseId: activeInvestigation?.investigation_id || null, // The API doesn't return case_id directly in InvestigationResult, but we could infer from context or just use investigation_id
-    investigationId: activeInvestigation?.investigation_id || null,
-    targetAddress: activeInvestigation?.address || null,
-    chain: activeInvestigation?.chain || null,
-    riskScore: activeInvestigation?.risk?.score ?? null,
-    riskLevel: activeInvestigation?.risk?.level ?? null,
-    investigationStatus: activeInvestigation ? 'Completed' : null,
-    
+    caseId: (inv?.case_id as string | null) ?? inv?.investigation_id ?? null,
+    investigationId: inv?.investigation_id ?? null,
+    targetAddress: inv?.address ?? null,
+    chain: inv?.chain ?? null,
+    riskScore: inv?.risk?.score ?? null,
+    riskLevel: inv?.risk?.level ?? null,
+    investigationStatus: (inv?.status as string | null) ?? (inv ? 'Completed' : null),
+
+    transactions,
+    counterparties,
+
     setInvestigation,
     setGraph,
     setLoading: setIsLoading,

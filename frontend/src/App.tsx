@@ -199,10 +199,6 @@ export default function App() {
       setLoaderStep(0)
       setLiveEvents([])
       
-      const loaderInterval = setInterval(() => {
-         setLoaderStep(prev => prev < 7 ? prev + 1 : prev)
-      }, 8500) // Progress the loader artificially to keep pace with backend (~60 seconds)
-      
       await new Promise<void>((resolve, reject) => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
         const wsUrl = `${protocol}//${window.location.host}/api/v1/ws/cases/${caseId}`
@@ -222,6 +218,7 @@ export default function App() {
             include_vasp: true,
             include_raw: true,
             force_refresh: false,
+            max_records: 100,
           }
           
           // Trigger the background worker NOW that the websocket is listening
@@ -240,12 +237,32 @@ export default function App() {
             let msg = data.message || (data.event_type ? `Processing ${data.event_type}...` : 'Worker update')
             setLiveEvents(prev => [...prev, { timestamp: time, message: msg }])
             
+            if (data.event_type === 'job.progress') {
+               const stage = data.payload?.stage
+               if (stage === 'Querying Global Blockchain Networks') {
+                   setLoaderStep(2)
+               } else if (stage === 'Extracting High-Volume Transaction Graph') {
+                   setLoaderStep(3)
+               } else if (stage === 'Cross-Referencing VASP Intelligence Oracles') {
+                   setLoaderStep(5)
+               } else if (stage === 'Running Risk Fusion & Attribution Models') {
+                   setLoaderStep(6)
+               }
+            }
+
             if (data.event_type === 'job.completed') {
                const finalData = data.payload?.result
                if (finalData) {
-                  // Set to context
-                  setInvestigation(finalData, finalData.graph ?? null)
-            
+                  // Use inline graph from payload directly (works for both demo and real)
+                  const inlineGraph = finalData.graph ?? null
+                  setInvestigation(finalData, inlineGraph)
+
+                  // Determine VASP exchange name from counterparty_order or vasp_entities
+                  const vaspEntities = finalData.vasp?.vasp_entities as Array<Record<string, unknown>> | undefined
+                  const cpo = finalData.vasp?.counterparty_order as Array<Record<string, unknown>> | undefined
+                  const firstIdentified = cpo?.find((c: Record<string, unknown>) => c.identified) ?? vaspEntities?.[0]
+                  const exchangeName = String(firstIdentified?.entity_name ?? firstIdentified?.name ?? 'Unidentified')
+
                   // Add to recent traces list
                   setRecentTraces((prev) => [
                     {
@@ -254,16 +271,16 @@ export default function App() {
                       chain: finalData.chain,
                       risk: finalData.risk?.level ?? 'MEDIUM',
                       score: finalData.risk?.score ?? 0,
-                      exchange: String(((finalData.vasp?.target as Record<string, any> | undefined)?.verdict as Record<string, any> | undefined)?.consensus ?? 'Unidentified'),
+                      exchange: exchangeName,
                       time: 'Just now',
                     },
                     ...prev.slice(0, 7),
                   ])
-            
-                  // Attempt loading Neo4j graph if id exists
-                  if (finalData.investigation_id) {
+
+                  // Only fall back to Neo4j if inline graph is empty
+                  if (finalData.investigation_id && (!inlineGraph || (inlineGraph.node_count ?? 0) === 0)) {
                     const neoGraph = await loadGraph(finalData.investigation_id).catch(() => null)
-                    if (neoGraph?.status === 'ok') {
+                    if (neoGraph?.status === 'ok' && (neoGraph.node_count ?? 0) > 0) {
                       setContextGraph(neoGraph)
                     }
                   }
@@ -271,8 +288,8 @@ export default function App() {
                ws.close()
                resolve()
             }
-            
-            if (data.event_type === 'job.failed') {
+
+                        if (data.event_type === 'job.failed') {
                ws.close()
                reject(new Error(data.payload?.error || 'Worker job failed'))
             }
@@ -285,8 +302,6 @@ export default function App() {
            reject(new Error('WebSocket connection error'))
         }
       })
-
-      clearInterval(loaderInterval)
     } catch (err: unknown) {
       setInvestigationError(err instanceof Error ? err.message : 'Investigation backend unavailable')
       setCurrentRoute('dashboard')
@@ -385,7 +400,7 @@ export default function App() {
                     { id: 0, label: 'Initializing Forensic Engine & Worker Node' },
                     { id: 1, label: 'Connecting to Blockchain RPC Nodes' },
                     { id: 2, label: 'Querying Global Blockchain Networks' },
-                    { id: 3, label: 'Extracting High-Volume Transaction Graph (0/50 pages)' },
+                    { id: 3, label: 'Extracting High-Volume Transaction Graph' },
                     { id: 4, label: 'Ingesting Transactions into Neo4j' },
                     { id: 5, label: 'Cross-Referencing VASP Intelligence Oracles' },
                     { id: 6, label: 'Computing Graph Centralities & Hubs' },

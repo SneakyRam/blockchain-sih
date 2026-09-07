@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useInvestigation } from '../context/InvestigationContext';
 import { GraphStudio } from './GraphStudio';
-import { FundFlow } from './FundFlow';
+import { FundFlowView } from './FundFlow';
 import { Transactions } from './Transactions';
 import { Timeline } from './Timeline';
 import { RiskIntelligence } from './RiskIntelligence';
@@ -22,15 +22,15 @@ interface TabDefinition {
 
 const tabs: TabDefinition[] = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'graph', label: 'Graph Studio', icon: Network },
-  { id: 'fund-flow', label: 'Fund Flow', icon: GitCommit },
-  { id: 'topology', label: 'Topology', icon: Activity },
+  { id: 'graph', label: 'Transaction Graph (Neo4j)', icon: Network },
+  { id: 'fund-flow', label: 'Cross-Chain Fund Flow', icon: GitCommit },
+  { id: 'topology', label: 'Blockchain Topology', icon: Activity },
   { id: 'transactions', label: 'Transactions', icon: List },
-  { id: 'entities', label: 'Entities', icon: Building },
+  { id: 'entities', label: 'VASP Identification', icon: Building },
   { id: 'timeline', label: 'Timeline', icon: Clock },
-  { id: 'risk', label: 'Risk Intelligence', icon: AlertTriangle },
+  { id: 'risk', label: 'AI/ML Risk Detection', icon: AlertTriangle },
   { id: 'evidence', label: 'Evidence', icon: FileText },
-  { id: 'report', label: 'Report', icon: Download },
+  { id: 'report', label: 'Automated Investigation Report', icon: Download },
 ];
 
 export function InvestigationWorkspace() {
@@ -122,7 +122,7 @@ export function InvestigationWorkspace() {
         )}
         {activeTab === 'graph' && (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Graph Studio</h3>
+            <h3 style={{ marginBottom: '1rem' }}>Transaction Graph (Neo4j)</h3>
             <div style={{ flex: 1, minHeight: '500px' }}>
               <GraphStudio />
             </div>
@@ -131,7 +131,7 @@ export function InvestigationWorkspace() {
         {activeTab === 'fund-flow' && (
           <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ marginBottom: '1rem' }}>Fund Flow</h3>
-            <FundFlow />
+            <FundFlowView />
           </div>
         )}
         {activeTab === 'topology' && (

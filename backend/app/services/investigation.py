@@ -3,10 +3,15 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal
+import asyncio
 from uuid import uuid4
 from typing import Any
 
 from app.config import Settings
+from app.mock_data import MOCK_EVENTS, MOCK_VASP_SUMMARY, MOCK_WALLET, MOCK_THREAT_INTEL
+from app.intelligence.typology import TypologyEngine
+from app.intelligence.fraud_typology import FraudTypologyClassifier
+from app.intelligence.risk_fusion import RiskFusionEngine
 from app.connectors.alchemy import AlchemyConnector
 from app.connectors.bitquery import BitqueryConnector
 from app.connectors.blockchain_com import BlockchainComConnector
@@ -18,6 +23,7 @@ from app.core.graph import build_transaction_graph
 from app.core.normalize import derive_features, public_event, sort_events, strip_none
 from app.core.risk import calculate_risk
 from app.graph.service import get_graph_service
+from app.redis.event_service import get_event_service
 from app.schemas.models import InvestigationRequest
 from app.storage.json_store import save_snapshot
 from app.vasp.service import VASPService
@@ -138,7 +144,160 @@ class InvestigationService:
                     counts[candidate] += 1
         return [{"address": addr, "count": count} for addr, count in counts.most_common()]
 
+    async def _emit_progress(self, request: InvestigationRequest, stage: str) -> None:
+        try:
+            await get_event_service().publish(
+                event_type="job.progress",
+                case_id=request.case_id,
+                payload={"stage": stage},
+            )
+        except Exception:
+            pass
+
+    async def _run_demo_investigation(self, request: InvestigationRequest, investigation_id: str | None = None) -> dict[str, Any]:
+        investigation_id = investigation_id or uuid4().hex
+        queried_at = datetime.now(timezone.utc).isoformat()
+
+        await self._emit_progress(request, "Querying Global Blockchain Networks")
+        await asyncio.sleep(1.2)
+
+        await self._emit_progress(request, "Extracting High-Volume Transaction Graph")
+        await asyncio.sleep(1.2)
+
+        # Normalise mock events — fix direction to match risk/typology engines
+        raw_events: list[dict[str, Any]] = []
+        for e in MOCK_EVENTS:
+            ev = dict(e)
+            d = str(ev.get("direction", "")).lower()
+            if d == "inbound":
+                ev["direction"] = "in"
+            elif d == "outbound":
+                ev["direction"] = "out"
+                
+            cps = set(ev.get("counterparty_addresses") or [])
+            if ev.get("from_address"):
+                cps.add(ev["from_address"])
+            if ev.get("to_address"):
+                cps.add(ev["to_address"])
+            ev["counterparty_addresses"] = list(cps)
+            
+            raw_events.append(ev)
+
+        public_transactions = [public_event(ev) for ev in sort_events(raw_events)]
+        counterparties = self._counterparties_from_events(request.address, public_transactions)
+
+        await self._emit_progress(request, "Cross-Referencing VASP Intelligence Oracles")
+        await asyncio.sleep(1.2)
+
+        vasp_entities = MOCK_VASP_SUMMARY.get("vasp_entities", [])
+        vasp_summary: dict[str, Any] = {
+            "status": "ok",
+            "target": {
+                "verdict": {"state": "conflict", "identified": False, "consensus": "Tornado Cash Exposure"}
+            },
+            "counterparties": {
+                str(vasp_entities[0]["address"]).lower(): {
+                    "verdict": {"state": "sanctioned", "identified": True, "consensus": "Tornado Cash"}
+                },
+                str(vasp_entities[1]["address"]).lower(): {
+                    "verdict": {"state": "identified", "identified": True, "consensus": "Binance"}
+                },
+            },
+            "counterparty_order": [
+                {"address": e["address"], "count": 1, "vasp_state": e.get("vasp_type", "unknown"),
+                 "identified": True, "entity_name": e["name"], "cache_hit": True}
+                for e in vasp_entities
+            ],
+            "address_labels": MOCK_VASP_SUMMARY.get("address_labels", {}),
+            "identified_count": 2,
+            "state_counts": {"sanctioned": 1, "identified": 1, "unidentified": 1},
+            "vasp_entities": vasp_entities,
+            "counterparty_risks": MOCK_VASP_SUMMARY.get("counterparty_risks", {}),
+        }
+
+        await self._emit_progress(request, "Running Risk Fusion & Attribution Models")
+        await asyncio.sleep(1.2)
+
+        labels_map: dict[str, str] = dict(MOCK_VASP_SUMMARY.get("address_labels", {}))
+        graph = build_transaction_graph(request.address, public_transactions, labels_map)
+
+        # Annotate graph nodes with vasp_type for graph coloring
+        vasp_type_map = {
+            str(e["address"]).lower(): str(e.get("vasp_type", "")).lower()
+            for e in vasp_entities
+        }
+        for node in graph.get("nodes", []):
+            addr = str(node.get("address", "")).lower()
+            if addr in vasp_type_map:
+                node["vasp_type"] = vasp_type_map[addr]
+
+        risk = calculate_risk(public_transactions, counterparties, vasp_summary)
+        risk["factors"] = [
+            "Funds sent to OFAC-sanctioned Tornado Cash mixer",
+            "Off-ramp detected to Binance exchange (VASP)",
+            "Rapid fund movement — multi-hop within 72 hours",
+            "Non-custodial burner wallet used for layering",
+            "High counterparty fanout to 4 distinct addresses",
+        ]
+
+        derived = derive_features(request.address, public_transactions)
+
+        typology_findings = TypologyEngine().evaluate(request.address, public_transactions, vasp_summary)
+        fraud_classification = FraudTypologyClassifier().classify(request.address, public_transactions, counterparties, vasp_summary, risk)
+        risk_fusion = RiskFusionEngine().evaluate(risk, typology_findings, threat_intel=MOCK_THREAT_INTEL, transactions=public_transactions)
+
+        payload: dict[str, Any] = {
+            "investigation_id": investigation_id,
+            "address": request.address,
+            "chain": str(MOCK_WALLET["chain"]),
+            "queried_at": queried_at,
+            "case_id": request.case_id,
+            "complaint_id": request.complaint_id,
+            "fraud_type": request.fraud_type or "Investment Scam",
+            "reported_amount": request.reported_amount,
+            "reported_at": request.reported_at,
+            "victim_reference": request.victim_reference,
+            "status": "completed",
+            "collection": {
+                "max_records_requested": 100,
+                "page_size": 50,
+                "providers": {"demo": {"status": "ok"}},
+            },
+            "wallet": MOCK_WALLET,
+            "normalized": {
+                "investigation_id": investigation_id,
+                "wallet": MOCK_WALLET,
+                "transactions": public_transactions,
+                "counterparties": counterparties,
+                "assets": [],
+                "counts": {
+                    "transactions": len(public_transactions),
+                    "counterparties": len(counterparties),
+                    "assets": 0,
+                },
+                "derived": derived,
+                "risk": risk,
+            },
+            "transactions": public_transactions,
+            "counterparties": counterparties,
+            "assets": [],
+            "graph": graph,
+            "derived": derived,
+            "risk": risk,
+            "vasp": vasp_summary,
+            "typology_findings": typology_findings,
+            "fraud_classification": fraud_classification,
+            "risk_fusion": risk_fusion,
+            "errors": [],
+            "storage": {},
+            "graph_sync": {"status": "demo"},
+        }
+        return payload
+
     async def investigate(self, request: InvestigationRequest, investigation_id: str | None = None) -> dict[str, Any]:
+        if request.address.lower() == "0xdemo_sih_183":
+            return await self._run_demo_investigation(request, investigation_id)
+
         chain = self.resolve_chain(request)
         limit = request.max_records or self.settings.max_records
         page_size = request.page_size or self.settings.page_size
@@ -152,6 +311,8 @@ class InvestigationService:
         wallet: dict[str, Any] = {"address": request.address, "chain": chain}
         events: list[dict[str, Any]] = []
         assets: list[Any] = []
+
+        await self._emit_progress(request, "Querying Global Blockchain Networks")
 
         if chain == "bitcoin":
             try:
@@ -302,12 +463,15 @@ class InvestigationService:
         else:
             raise ValueError(f"Unsupported chain '{chain}'")
 
+        await self._emit_progress(request, "Extracting High-Volume Transaction Graph")
+
         deduped = self._dedupe_events(events)
         public_transactions = [public_event(event) for event in sort_events(deduped)]
         counterparties = self._counterparties_from_events(request.address, public_transactions)
         derived = derive_features(request.address, public_transactions)
 
         if request.include_vasp:
+            await self._emit_progress(request, "Cross-Referencing VASP Intelligence Oracles")
             vasp_summary = await self._enrich_vasp(chain, request.address, counterparties)
         else:
             vasp_summary = {"status": "not_requested"}
@@ -322,6 +486,8 @@ class InvestigationService:
                 label = self._best_vasp_label(result)
                 if label:
                     labels_map[address.lower()] = label
+
+        await self._emit_progress(request, "Running Risk Fusion & Attribution Models")
 
         graph = build_transaction_graph(request.address, public_transactions, labels_map)
         risk = calculate_risk(public_transactions, counterparties, vasp_summary)
@@ -339,6 +505,10 @@ class InvestigationService:
             "derived": derived,
             "risk": risk,
         }
+
+        typology_findings = TypologyEngine().evaluate(request.address, public_transactions, vasp_summary)
+        fraud_classification = FraudTypologyClassifier().classify(request.address, public_transactions, counterparties, vasp_summary, risk)
+        risk_fusion = RiskFusionEngine().evaluate(risk, typology_findings, transactions=public_transactions)
 
         payload = {
             "investigation_id": investigation_id,
@@ -368,6 +538,9 @@ class InvestigationService:
             "derived": derived,
             "risk": risk,
             "vasp": vasp_summary,
+            "typology_findings": typology_findings,
+            "fraud_classification": fraud_classification,
+            "risk_fusion": risk_fusion,
             "errors": errors,
         }
 

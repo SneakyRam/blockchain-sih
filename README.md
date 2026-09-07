@@ -33,6 +33,12 @@ Install:
 - Redis 6 or newer
 - Neo4j 5 or newer
 
+Runtime responsibilities:
+
+- Node.js/npm runs the React/Vite frontend and installs JavaScript dependencies.
+- Python runs the FastAPI backend, migration runner, and background worker.
+- PostgreSQL, Redis, and Neo4j run as separate local services.
+
 Optional:
 
 - provider API keys for live blockchain collection
@@ -148,6 +154,15 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
+If the backend or worker reports `ModuleNotFoundError: No module named
+'redis'`, activate this environment and run the requirements command again.
+Verify the interpreter before retrying:
+
+```bash
+which python
+python --version
+```
+
 ### Windows PowerShell
 
 ```powershell
@@ -156,6 +171,15 @@ py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+```
+
+If the backend or worker reports `ModuleNotFoundError: No module named
+'redis'`, activate `.venv` and run the requirements command again. Verify the
+interpreter with:
+
+```powershell
+Get-Command python
+python --version
 ```
 
 If PowerShell blocks activation for the current user:
@@ -230,7 +254,7 @@ does not print secret values.
 
 ## 10. Start the application
 
-Open two terminals.
+Open three terminals: backend, worker, and frontend.
 
 ### Terminal 1: backend
 
@@ -268,6 +292,33 @@ npm run dev
 Open the URL printed by Vite, normally
 <http://127.0.0.1:5173>.
 
+### Windows PowerShell worker
+
+```powershell
+Set-Location TraceX\backend
+.\.venv\Scripts\Activate.ps1
+python -m app.workers.worker
+```
+
+## 10.1 Run the demo investigation
+
+1. Start PostgreSQL, Redis, and Neo4j.
+2. Start the backend, worker, and frontend using the terminals above.
+3. Open <http://127.0.0.1:5173>.
+4. Enter a valid Ethereum address, select **Ethereum**, and click
+   **Investigate**.
+
+`0xDEMO_SIH_183` is only a label and is not a valid Ethereum address.
+Ethereum addresses contain exactly 40 hexadecimal characters after `0x`.
+For a syntax-only connectivity test, use:
+
+```text
+0x0000000000000000000000000000000000000000
+```
+
+Use a real wallet address for useful provider-backed results. Empty provider
+keys or provider rate limits may produce an empty or partial collection.
+
 ## 11. Workers, Redis, and realtime events
 
 Redis must be running for queue and realtime features. The worker process is
@@ -278,6 +329,21 @@ the virtual environment active:
 ```bash
 python -m app.workers.worker
 ```
+
+The equivalent backend command is:
+
+```bash
+uvicorn app.main:app --port 8000 --reload
+```
+
+Run it from `backend` with `.venv` active. Keep the worker in a separate
+terminal:
+
+```bash
+python -m app.workers.worker
+```
+
+The worker requires Redis and the Python `redis` package.
 
 If your checkout exposes a different worker entry point, inspect:
 
