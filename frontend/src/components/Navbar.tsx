@@ -23,11 +23,10 @@ export function Navbar({
   const [userMenuOpen, setUserMenuOpen] = React.useState(false)
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Layers },
-    { id: 'trace', label: 'Trace Tool', icon: Search },
-    { id: 'complaints', label: 'Complaints', icon: FileText },
-    { id: 'alerts', label: 'Alerts', icon: AlertTriangle, badge: unreadAlertCount },
-    { id: 'reports', label: 'Reports', icon: Shield },
+    { id: 'dashboard', label: 'Command Center', icon: Layers },
+    { id: 'cases', label: 'Cases', icon: FileText },
+    { id: 'trace', label: 'Active Trace', icon: Search },
+    { id: 'alerts', label: 'System Health', icon: AlertTriangle, badge: unreadAlertCount },
   ]
 
   return (
@@ -35,8 +34,7 @@ export function Navbar({
       position: 'sticky',
       top: 0,
       zIndex: 50,
-      backgroundColor: 'var(--surface-card)',
-      backdropFilter: 'var(--glass-blur)',
+      backgroundColor: 'var(--surface)',
       borderBottom: '1px solid var(--surface-card-border)',
       padding: '0.75rem 2rem',
     }}>
@@ -58,12 +56,11 @@ export function Navbar({
           }}
         >
           <div style={{
-            background: 'var(--primary-gradient)',
+            background: 'var(--primary)',
             padding: '0.4rem',
-            borderRadius: '8px',
-            color: '#040508',
+            borderRadius: 'var(--border-radius-sm)',
+            color: '#FFFFFF',
             display: 'flex',
-            boxShadow: '0 0 12px rgba(0, 242, 254, 0.4)',
           }}>
             <Shield size={20} />
           </div>
@@ -98,7 +95,7 @@ export function Navbar({
                 key={item.id}
                 onClick={() => onRouteChange(item.id)}
                 style={{
-                  background: isActive ? (theme === 'dark' ? 'rgba(0, 242, 254, 0.15)' : 'var(--surface)') : 'transparent',
+                  background: isActive ? 'var(--surface-hover)' : 'transparent',
                   color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
                   border: isActive ? '1px solid var(--surface-card-border)' : '1px solid transparent',
                   borderRadius: '6px',
@@ -203,9 +200,9 @@ export function Navbar({
                 width: '24px',
                 height: '24px',
                 borderRadius: '50%',
-                background: 'var(--primary-gradient)',
-                color: '#040508',
-                fontWeight: 700,
+                background: 'var(--surface-card-border)',
+                color: 'var(--text-primary)',
+                fontWeight: 600,
                 fontSize: '0.75rem',
                 display: 'flex',
                 alignItems: 'center',
@@ -220,7 +217,7 @@ export function Navbar({
 
             {userMenuOpen && (
               <div
-                className="glass-panel"
+                className="panel"
                 style={{
                   position: 'absolute',
                   right: 0,

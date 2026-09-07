@@ -353,6 +353,7 @@ class Neo4jGraphService:
                 WITH row WHERE row.properties.contract_address <> ''
                 MERGE (p:Protocol {identity: $protocol_prefix + toLower(row.properties.contract_address)})
                 SET p.address = row.properties.contract_address, p.chain = $chain, p.type = row.properties.transaction_type
+                  WITH p, row
                 MATCH (t:Transaction {identity: row.identity})
                 MATCH (w:Wallet)-[:SOURCE_OF|DESTINATION_OF]-(t)
                 MERGE (w)-[:INTERACTED_WITH]->(p)
@@ -448,26 +449,83 @@ class Neo4jGraphService:
     async def path(self, chain: str, source: str, target: str, max_depth: int) -> dict[str, Any]:
         if not self.settings.neo4j_enabled:
             return {"status": "disabled", "nodes": [], "edges": []}
+
         connection = await self.connect()
+
         if connection.get("status") != "ok" or self.driver is None:
-            return {"status": "unavailable", "detail": connection.get("detail", "Neo4j connection failed"), "nodes": [], "edges": []}
+            return {
+                "status": "unavailable",
+                "detail": connection.get(
+                    "detail",
+                    "Neo4j connection failed",
+                ),
+                "nodes": [],
+                "edges": [],
+            }
+
         max_depth = max(1, min(max_depth, 10))
-        async with self.driver.session(database=self.settings.neo4j_database) as session:
+
+        async with self.driver.session(
+            database=self.settings.neo4j_database
+        ) as session:
             result = await session.run(
                 f"""
-                MATCH p=shortestPath((source:Wallet {{identity: $source}})-[*..{max_depth}]-(target:Wallet {{identity: $target}}))
+                MATCH p=shortestPath(
+                    (source:Wallet {{identity: $source}})
+                    -[:SOURCE_OF|DESTINATION_OF*..{max_depth}]-
+                    (target:Wallet {{identity: $target}})
+                )
                 UNWIND nodes(p) AS n
-                RETURN collect(DISTINCT {{type: labels(n)[0], properties: properties(n)}}) AS nodes,
-                    [rel IN relationships(p) | {{source: startNode(rel).identity, target: endNode(rel).identity, type: type(rel), properties: properties(rel)}}] AS edges
+                RETURN
+                    collect(
+                        DISTINCT {{
+                            type: labels(n)[0],
+                            properties: properties(n)
+                        }}
+                    ) AS nodes,
+                    [
+                        rel IN relationships(p) |
+                        {{
+                            source: startNode(rel).identity,
+                            target: endNode(rel).identity,
+                            type: type(rel),
+                            properties: properties(rel)
+                        }}
+                    ] AS edges
                 """,
                 source=_address_key(chain, source),
                 target=_address_key(chain, target),
             )
+
             record = await result.single()
+
         if record is None:
-            return {"status": "not_found", "nodes": [], "edges": []}
-        nodes = [{"type": item["type"], **dict(item["properties"])} for item in record["nodes"]]
-        return {"status": "ok", "nodes": nodes, "edges": [dict(edge) for edge in record["edges"]], "node_count": len(nodes), "edge_count": len(record["edges"])}
+            return {
+                "status": "not_found",
+                "nodes": [],
+                "edges": [],
+            }
+
+        nodes = [
+            {
+                "type": item["type"],
+                **dict(item["properties"]),
+            }
+            for item in record["nodes"]
+        ]
+
+        edges = [
+            dict(edge)
+            for edge in record["edges"]
+        ]
+
+        return {
+            "status": "ok",
+            "nodes": nodes,
+            "edges": edges,
+            "node_count": len(nodes),
+            "edge_count": len(edges),
+        }
 
 
 _service: Neo4jGraphService | None = None

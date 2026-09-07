@@ -76,7 +76,8 @@ class InvestigationService:
         return ""
 
     async def _enrich_vasp(self, chain: str, target_address: str, counterparties: list[dict[str, Any]]) -> dict[str, Any]:
-        addresses = [target_address] + [item["address"] for item in counterparties]
+        top_counterparties = counterparties[:15]
+        addresses = [target_address] + [item["address"] for item in top_counterparties]
         results = await self.vasp.check_addresses(addresses, chain=chain, force_refresh=False)
         target_key = target_address.lower()
         target = results.get(target_key, {})

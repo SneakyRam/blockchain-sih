@@ -83,10 +83,15 @@ async def run_investigation_handler(
             "status",
             "completed",
         ),
+        "address": request.address,
+        "chain": request.chain,
         "transaction_count": len(
             result.get("transactions") or []
         ),
+        "transactions": result.get("transactions") or [],
         "risk": result.get("risk") or {},
+        "graph": result.get("graph"),
+        "vasp": result.get("vasp"),
     }
 
 

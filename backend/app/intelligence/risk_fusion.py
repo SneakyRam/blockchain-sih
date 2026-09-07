@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 
+from app.intelligence.ml_risk import ml_risk_model
+
 def _level(score: int) -> str:
     return "CRITICAL" if score >= 80 else "HIGH" if score >= 55 else "MEDIUM" if score >= 30 else "LOW"
 
@@ -20,6 +22,7 @@ class RiskFusionEngine:
         findings: list[dict[str, Any]],
         threat_intel: list[dict[str, Any]] | None = None,
         attribution: dict[str, Any] | None = None,
+        transactions: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         baseline_score = int(baseline.get("score") or 0)
         factors = [{
@@ -79,10 +82,23 @@ class RiskFusionEngine:
                     "provider_verdict_state": attribution_data.get("provider_verdict_state", ""),
                 },
             })
-        score = min(100, baseline_score + additions)
+        # Add ML Model prediction if transactions exist
+        if transactions:
+            ml_risk_score = ml_risk_model.predict_risk(transactions)
+            if ml_risk_score > 0:
+                additions += ml_risk_score
+                factors.append({
+                    "source": "ml_model",
+                    "id": ml_risk_model.model_name,
+                    "points": round(ml_risk_score),
+                    "confidence": 0.85,
+                    "explanation": f"ML Model Risk Prediction ({ml_risk_model.version}) based on transaction behavior (volume, fan-out, sizes).",
+                })
+
+        score = min(100, baseline_score + round(additions))
         return {
-            "score": score, "level": _level(score), "method": "explainable_risk_fusion_v1",
-            "model_ready": False, "baseline": baseline, "factors": factors,
+            "score": score, "level": _level(score), "method": "explainable_risk_fusion_v2_with_ml",
+            "model_ready": True, "baseline": baseline, "factors": factors,
             "evidence_event_ids": list(dict.fromkeys(evidence_ids)),
             "disclaimer": "Investigative prioritization based on observable signals and configured rules; not a legal conclusion.",
         }

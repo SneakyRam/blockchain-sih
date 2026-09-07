@@ -190,7 +190,8 @@ class CaseInvestigationService:
             result.get("risk") or {},
             findings,
             threat_intel,
-            result["attribution"],
+            result.get("attribution", {}),
+            result.get("transactions", []),
         )
 
         completed_run = self.repository.complete_investigation_run(

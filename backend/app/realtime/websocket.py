@@ -49,10 +49,20 @@ async def case_realtime_websocket(
         )
 
         while True:
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True,
-                timeout=1.0,
-            )
+            try:
+                message = await pubsub.get_message(
+                    ignore_subscribe_messages=True,
+                    timeout=1.0,
+                )
+            except Exception as e:
+                logger.warning(f"Redis pubsub error, reconnecting: {e}")
+                await asyncio.sleep(1.0)
+                try:
+                    pubsub = redis_client.pubsub()
+                    await pubsub.subscribe(channel)
+                except Exception:
+                    pass
+                continue
 
             if message:
                 raw_data = message.get("data")

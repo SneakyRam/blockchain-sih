@@ -1,9 +1,10 @@
 from functools import lru_cache
+from pathlib import Path
 from pydantic import BaseModel
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
 
 class Settings(BaseModel):
     database_url: str = os.getenv("DATABASE_URL", "")

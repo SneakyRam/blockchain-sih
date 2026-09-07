@@ -20,7 +20,7 @@ class VASPProviderResult(BaseModel):
     wallet_id: str = ""
     chain_id: int | None = None
     confidence: str = ""
-    error: str = ""
+    error: Any = ""
     cache_hit: bool = False
     raw: dict[str, Any] = Field(default_factory=dict)
 

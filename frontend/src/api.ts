@@ -41,6 +41,24 @@ export function investigate(input: InvestigationInput): Promise<InvestigationRes
   })
 }
 
+export function createCase(payload: any): Promise<any> {
+  return request('/api/v1/cases', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function runCaseInvestigation(caseId: string, payload: InvestigationInput): Promise<any> {
+  return request(`/api/v1/cases/${encodeURIComponent(caseId)}/investigations`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function getCaseInvestigation(caseId: string, runId: string): Promise<any> {
+  return request(`/api/v1/cases/${encodeURIComponent(caseId)}/investigations/${encodeURIComponent(runId)}`)
+}
+
 export function loadGraph(investigationId: string): Promise<GraphPayload> {
   return request<GraphPayload>(`/api/v1/graph/${encodeURIComponent(investigationId)}`)
 }
