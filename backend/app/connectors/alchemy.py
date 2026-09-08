@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any
 from decimal import Decimal
 from app.config import Settings

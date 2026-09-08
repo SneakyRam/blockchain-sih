@@ -1,6 +1,6 @@
 import React from 'react';
 import { useInvestigation } from '../context/InvestigationContext';
-import { Target, ShieldAlert, Activity, Building2, ArrowRightLeft, Hash } from 'lucide-react';
+import { Target, ShieldAlert, Activity, Building2, ArrowRightLeft, Hash, ShieldCheck, Download, Link as LinkIcon, FileText } from 'lucide-react';
 
 const LEVEL_COLORS: Record<string, string> = {
   CRITICAL: '#ef4444',
@@ -228,6 +228,55 @@ export function OverviewView() {
           )}
         </div>
       </div>
+
+      {/* SAHYOG / NCRP Integration Panel */}
+      <div className="panel" style={{ padding: '1.5rem', marginTop: '0.5rem', borderLeft: '4px solid #3b82f6' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <ShieldCheck size={20} color="var(--primary)" />
+            <h4 style={{ margin: 0, fontSize: '1.1rem' }}>Law Enforcement Integrations</h4>
+          </div>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Download size={14} /> Download Evidence PDF
+            </button>
+            <button className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#059669', borderColor: '#059669' }}>
+              <FileText size={14} /> Export to SAHYOG
+            </button>
+          </div>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div style={{ padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--surface-card-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>NCRP Alert Status</span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0' }}>
+              Automated alert generation for National Cyber Crime Reporting Portal.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#10b981', backgroundColor: '#10b98122', padding: '0.4rem 0.75rem', borderRadius: '4px', width: 'fit-content' }}>
+              <ShieldCheck size={14} /> Ready for Dispatch
+            </div>
+          </div>
+          
+          <div style={{ padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--surface-card-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: level === 'CRITICAL' || level === 'HIGH' ? '#ef4444' : '#f59e0b', boxShadow: level === 'CRITICAL' ? '0 0 8px #ef4444' : '' }} className={level === 'CRITICAL' ? 'animate-pulse-critical' : ''} />
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>SAHYOG Actionable Intelligence</span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0' }}>
+              {vaspEntities.length > 0 
+                ? `Identified ${vaspEntities.length} VASP(s) for immediate asset freezing requests.`
+                : 'No immediate VASP deposit points identified yet.'}
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--primary)', backgroundColor: 'var(--primary)22', padding: '0.4rem 0.75rem', borderRadius: '4px', width: 'fit-content' }}>
+              <LinkIcon size={14} /> Link Case Reference
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any
 from app.core.http import get_json
 from app.config import Settings

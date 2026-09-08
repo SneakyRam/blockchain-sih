@@ -10,7 +10,7 @@ cytoscape.use(fcose);
 cytoscape.use(nav);
 import {
   ZoomIn, ZoomOut, Maximize2, RefreshCw, Info,
-  Eye, EyeOff, Layers, Target, Share2
+  Eye, EyeOff, Layers, Target, Share2, Network
 } from 'lucide-react';
 
 // ─── Node type definitions ─────────────────────────────────────────────────
@@ -72,6 +72,7 @@ export function GraphStudio() {
   const [selectedNode, setSelectedNode] = useState<Record<string, unknown> | null>(null);
   const [showLabels, setShowLabels] = useState(true);
   const [showEdgeLabels, setShowEdgeLabels] = useState(true);
+  const [showClusters, setShowClusters] = useState(false);
   const [layout, setLayout] = useState<'fcose' | 'cose' | 'breadthfirst' | 'circle'>('fcose');
   const [nodeCount, setNodeCount] = useState(0);
   const [edgeCount, setEdgeCount] = useState(0);
@@ -250,7 +251,40 @@ export function GraphStudio() {
       selector: 'edge:selected',
       style: { 'line-color': '#60a5fa', 'width': 3, 'overlay-opacity': 0.1 } as Record<string, unknown>,
     },
-  ], [showLabels, showEdgeLabels]);
+    // Cluster visual enhancements
+    ...(showClusters ? [
+      {
+        selector: 'node[kind="exchange"]',
+        style: {
+          'border-width': 4,
+          'underlay-color': '#f59e0b',
+          'underlay-padding': 25,
+          'underlay-opacity': 0.35,
+          'underlay-shape': 'roundrectangle'
+        } as Record<string, unknown>
+      },
+      {
+        selector: 'node[kind="mixer"]',
+        style: {
+          'border-width': 4,
+          'underlay-color': '#a855f7',
+          'underlay-padding': 25,
+          'underlay-opacity': 0.35,
+          'underlay-shape': 'roundrectangle'
+        } as Record<string, unknown>
+      },
+      {
+        selector: 'node[kind="bridge"]',
+        style: {
+          'border-width': 4,
+          'underlay-color': '#06b6d4',
+          'underlay-padding': 25,
+          'underlay-opacity': 0.35,
+          'underlay-shape': 'roundrectangle'
+        } as Record<string, unknown>
+      }
+    ] : [])
+  ], [showLabels, showEdgeLabels, showClusters]);
 
   // Mount Cytoscape
   useEffect(() => {
@@ -344,7 +378,7 @@ export function GraphStudio() {
   // Update styles without relayout
   useEffect(() => {
     cyRef.current?.style(buildStyles());
-  }, [showLabels, showEdgeLabels, buildStyles]);
+  }, [showLabels, showEdgeLabels, showClusters, buildStyles]);
 
   const zoomIn = () => cyRef.current?.zoom({ level: (cyRef.current.zoom() * 1.2), renderedPosition: { x: (containerRef.current?.clientWidth ?? 400) / 2, y: (containerRef.current?.clientHeight ?? 400) / 2 } });
   const zoomOut = () => cyRef.current?.zoom({ level: (cyRef.current.zoom() / 1.2), renderedPosition: { x: (containerRef.current?.clientWidth ?? 400) / 2, y: (containerRef.current?.clientHeight ?? 400) / 2 } });
@@ -410,6 +444,9 @@ export function GraphStudio() {
             >{l}</button>
           ))}
           <div style={{ width: 1, height: 20, backgroundColor: 'var(--surface-card-border)' }} />
+          <button onClick={() => setShowClusters(v => !v)} title="Toggle clusters" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: showClusters ? 'var(--primary)' : 'var(--text-secondary)' }}>
+            <Network size={16} />
+          </button>
           <button onClick={() => setShowLabels(v => !v)} title={showLabels ? 'Hide labels' : 'Show labels'} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: showLabels ? 'var(--primary)' : 'var(--text-secondary)' }}>
             {showLabels ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>

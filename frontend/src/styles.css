@@ -7,9 +7,9 @@
   --bg-secondary: #0B0F19; /* Darker Slate */
   --surface: #1E293B; /* Slate 800 */
   --surface-hover: #334155; /* Slate 700 */
-  --surface-card: #1E293B; /* Solid surface for hierarchy */
-  --surface-card-border: #334155;
-  --surface-card-hover-border: #475569;
+  --surface-card: rgba(30, 41, 59, 0.7); /* Translucent surface for glassmorphism */
+  --surface-card-border: rgba(51, 65, 85, 0.8);
+  --surface-card-hover-border: rgba(71, 85, 105, 0.9);
   
   --primary: #3B82F6; /* Blue 500 */
   --primary-hover: #2563EB; /* Blue 600 */
@@ -91,10 +91,39 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 /* Standard Panels */
 .panel {
   background: var(--surface-card);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--surface-card-border);
   border-radius: var(--border-radius-md);
   box-shadow: var(--card-shadow);
   overflow: hidden;
+  transition: all 0.2s ease-in-out;
+}
+
+.panel:hover {
+  border-color: var(--surface-card-hover-border);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.4), 0 4px 8px -2px rgba(0, 0, 0, 0.2);
+}
+
+/* Animations */
+@keyframes pulse-glow-critical {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes pulse-glow-amber {
+  0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.animate-pulse-critical {
+  animation: pulse-glow-critical 2s infinite;
+}
+
+.animate-pulse-amber {
+  animation: pulse-glow-amber 2.5s infinite;
 }
 
 /* Standard Buttons */

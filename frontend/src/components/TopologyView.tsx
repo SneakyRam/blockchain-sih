@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useInvestigation } from '../context/InvestigationContext';
-import { Activity, Network, Layers, TrendingUp, AlertTriangle, Target } from 'lucide-react';
+import { Activity, Network, Layers, TrendingUp, AlertTriangle, Target, BellRing, Route } from 'lucide-react';
 
 function MetricCard({ label, value, sub, color = 'var(--primary)' }: {
   label: string; value: string | number; sub?: string; color?: string;
@@ -263,6 +263,61 @@ export function TopologyView() {
           </div>
         </div>
       )}
+
+      {/* Automated Alerts & Laundering Detection */}
+      <div className="panel" style={{ padding: '1.5rem', marginTop: '0.5rem', borderLeft: '4px solid #ef4444' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+          <BellRing size={20} color="#ef4444" />
+          <h4 style={{ margin: 0, fontSize: '1.1rem' }}>Automated Alerts & Laundering Detection</h4>
+        </div>
+        
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+          
+          {/* Typology Alerts */}
+          <div style={{ padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--surface-card-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <Layers size={16} color="#ef4444" />
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Intermediary Laundering Wallets</span>
+            </div>
+            {typologyFindings.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {typologyFindings.map((t, idx) => (
+                  <div key={idx} style={{ padding: '0.5rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: '4px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    <strong style={{ color: '#ef4444', display: 'block', marginBottom: '0.2rem' }}>{String(t.typology ?? 'Alert')}</strong>
+                    {String(t.description ?? '')}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
+                No explicit laundering intermediaries detected in current graph depth.
+              </p>
+            )}
+          </div>
+
+          {/* Cross-chain Alerts */}
+          <div style={{ padding: '1rem', backgroundColor: 'var(--surface)', borderRadius: '6px', border: '1px solid var(--surface-card-border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <Route size={16} color="#06b6d4" />
+              <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Cross-Chain Fund Movement</span>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '0 0 1rem 0' }}>
+              Detects bridged assets to other networks to evade tracking.
+            </p>
+            {activeGraph?.nodes.some(n => String((n as Record<string,unknown>).vasp_type ?? (n as Record<string,unknown>).type ?? '').toLowerCase() === 'bridge') ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: '#06b6d4', backgroundColor: '#06b6d422', padding: '0.4rem 0.75rem', borderRadius: '4px', width: 'fit-content' }}>
+                <AlertTriangle size={14} /> Bridge Nodes Detected
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)', backgroundColor: 'var(--surface-hover)', padding: '0.4rem 0.75rem', borderRadius: '4px', width: 'fit-content' }}>
+                No bridges detected
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
     </div>
   );
 }

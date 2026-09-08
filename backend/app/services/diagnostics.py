@@ -16,7 +16,7 @@ from app.vasp.metasleuth import MetaSleuthProvider
 from app.vasp.walletexplorer import WalletExplorerProvider
 
 
-@dataclass(slots=True)
+@dataclass
 class ProbeResult:
     reachable: bool
     successful: bool
@@ -24,7 +24,7 @@ class ProbeResult:
     error: str = ""
 
 
-@dataclass(slots=True)
+@dataclass
 class ProviderSpec:
     provider: str
     purpose: str
